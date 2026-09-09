@@ -3,7 +3,14 @@
 const $=id=>document.getElementById(id);
 const state={ws:null,symbol:'1HZ100V',prices:[],digits:Array(10).fill(0),stake:5,contract:'OVERUNDER',balance:10000,reconnect:null,pending:null,stats:{trades:0,wins:0,losses:0}};
 const ui={price:$('price'),digit:$('digitBig'),confidence:$('confidence'),direction:$('direction'),grid:$('digitGrid'),strongest:$('strongestDigit'),strongestPct:$('strongestPct'),connection:$('connection'),balance:$('balance'),payout:$('payout'),stake:$('stake')};
+const marketSelect=$('market');
 const feeds=['wss://api.derivws.com/trading/v1/options/ws/public','wss://ws.binaryws.com/websockets/v3'];
+const fallbackVolatilities=[
+ ['1HZ100V','Volatility 100 (1s) Index'],['1HZ90V','Volatility 90 (1s) Index'],['1HZ75V','Volatility 75 (1s) Index'],
+ ['1HZ50V','Volatility 50 (1s) Index'],['1HZ30V','Volatility 30 (1s) Index'],['1HZ25V','Volatility 25 (1s) Index'],
+ ['1HZ15V','Volatility 15 (1s) Index'],['1HZ10V','Volatility 10 (1s) Index'],['R_100','Volatility 100 Index'],
+ ['R_75','Volatility 75 Index'],['R_50','Volatility 50 Index'],['R_25','Volatility 25 Index'],['R_10','Volatility 10 Index']
+];
 let feedIndex=0;
 
 function fmt(n){return Number(n).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}
@@ -12,19 +19,15 @@ function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');set
 function setConn(t,ok=false){ui.connection.textContent='● '+t;ui.connection.style.color=ok?'#2ce795':'#ffc857'}
 
 function analyze(){
- if(state.digits.reduce((a,b)=>a+b,0)<8)return;
- const recentDigits=[];
- state.prices.slice(-40).forEach(v=>{const d=digit(v);if(d!==null)recentDigits.push(d)});
- const result=typeof analyzeAISignal==='function'
-   ? analyzeAISignal(recentDigits)
-   : {direction:'WAIT',confidence:0,predictionDigit:null};
- let displayDirection=result.direction;
- if(state.contract==='RISEFALL') displayDirection=result.direction==='OVER'?'RISE':result.direction==='UNDER'?'FALL':'WAIT';
- else if(state.contract==='EVENODD') displayDirection=(result.predictionDigit%2===0)?'EVEN':'ODD';
- ui.direction.textContent=displayDirection;
- ui.confidence.textContent=(result.confidence||0)+'%';
+ if(state.prices.length<8)return;
+ const p=state.prices.slice(-30),a=p[0],b=p.at(-1),delta=b-a,half=Math.floor(p.length/2);
+ const av1=p.slice(0,half).reduce((s,v)=>s+v,0)/half,av2=p.slice(half).reduce((s,v)=>s+v,0)/(p.length-half);
+ const bull=delta>0&&av2>=av1,bear=delta<0&&av2<=av1;
+ const dir=bull?'OVER':bear?'UNDER':'WAIT';
+ const conf=Math.min(95,Math.max(55,Math.round(55+Math.min(40,Math.abs(delta/Math.max(a,1))*100000*6))));
+ ui.direction.textContent=state.contract==='RISEFALL'?(bull?'RISE':bear?'FALL':'WAIT'):state.contract==='EVENODD'?'DIGIT '+(mostEven()?'EVEN':'ODD'):dir;
+ ui.confidence.textContent=conf+'%';
  updateDigits();
- if(result.predictionDigit!==undefined && result.predictionDigit!==null) ui.digit.textContent=result.predictionDigit;
 }
 function mostEven(){let e=0,o=0;for(let i=0;i<10;i++){if(i%2)o+=state.digits[i];else e+=state.digits[i]}return e>=o}
 function updateDigits(){
@@ -39,11 +42,36 @@ function onTick(t){
  const d=digit(q);if(d!==null)state.digits[d]++;
  ui.price.textContent=fmt(q);ui.digit.textContent=d===null?'—':d;analyze();settleDemoTrade(q);
 }
-function subscribe(ws){ws.send(JSON.stringify({ticks:state.symbol,subscribe:1,req_id:2}));ws.send(JSON.stringify({ticks_history:state.symbol,count:80,end:'latest',style:'ticks',req_id:3}));}
+function subscribe(ws){
+ ws.send(JSON.stringify({active_symbols:'brief',product_type:'basic',req_id:1}));
+ ws.send(JSON.stringify({ticks:state.symbol,subscribe:1,req_id:2}));
+ ws.send(JSON.stringify({ticks_history:state.symbol,count:80,end:'latest',style:'ticks',req_id:3}));
+}
+function populateVolatilities(items){
+ const current=state.symbol;
+ const list=(items||[]).map(x=>({
+   symbol:x.symbol||x.underlying_symbol,
+   name:x.display_name||x.underlying_symbol_name||x.symbol
+ })).filter(x=>x.symbol && /^Volatility\s/i.test(x.name));
+ const merged=new Map();
+ fallbackVolatilities.forEach(([symbol,name])=>merged.set(symbol,{symbol,name}));
+ list.forEach(x=>merged.set(x.symbol,x));
+ const sorted=[...merged.values()].sort((a,b)=>{
+   const a1=/\(1s\)/i.test(a.name), b1=/\(1s\)/i.test(b.name);
+   if(a1!==b1)return a1?-1:1;
+   const na=Number((a.name.match(/Volatility\s+(\d+)/i)||[])[1]||999);
+   const nb=Number((b.name.match(/Volatility\s+(\d+)/i)||[])[1]||999);
+   return na-nb;
+ });
+ marketSelect.innerHTML=sorted.map(x=>`<option value="${x.symbol}">${x.name}</option>`).join('');
+ marketSelect.value=sorted.some(x=>x.symbol===current)?current:state.symbol;
+}
+
 function connect(){
  clearTimeout(state.reconnect);setConn('Connecting…');const ws=new WebSocket(feeds[feedIndex]);state.ws=ws;let opened=false;
  ws.onopen=()=>{opened=true;setConn('Live market connected',true);subscribe(ws)};
  ws.onmessage=e=>{try{const d=JSON.parse(e.data);if(d.error){if(!opened&&feedIndex<feeds.length-1){feedIndex++;ws.close();connect()}return}
+  if(d.msg_type==='active_symbols'&&Array.isArray(d.active_symbols)){populateVolatilities(d.active_symbols)}
   if(d.msg_type==='history'&&d.history?.prices){state.prices=d.history.prices.map(Number).filter(Number.isFinite).slice(-120);state.digits=Array(10).fill(0);state.prices.forEach(v=>{const z=digit(v);if(z!==null)state.digits[z]++});analyze()}
   if(d.msg_type==='tick'&&d.tick)onTick(d.tick);
  }catch(_){}};
@@ -97,9 +125,9 @@ document.querySelectorAll('[data-delta]').forEach(b=>b.onclick=()=>setStake(stat
 document.querySelectorAll('[data-stake]').forEach(b=>b.onclick=()=>setStake(Number(b.dataset.stake)));
 $('place').onclick=()=>{
  const signal=ui.direction.textContent;
- if(signal==='OVER'||signal==='RISE'||signal==='EVEN'){ startDemoTrade('left'); }
- else if(signal==='UNDER'||signal==='FALL'||signal==='ODD'){ startDemoTrade('right'); }
- else { toast('AI signal is WAIT — no demo trade placed.'); }
+ if(signal==='OVER'||signal==='RISE'||signal==='EVEN') startDemoTrade('left');
+ else if(signal==='UNDER'||signal==='FALL'||signal==='ODD') startDemoTrade('right');
+ else toast('AI says WAIT — no demo trade placed.');
 };
 $('over').onclick=()=>startDemoTrade('left');
 $('under').onclick=()=>startDemoTrade('right');
