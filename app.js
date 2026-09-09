@@ -1,7 +1,7 @@
 (() => {
 'use strict';
 const $=id=>document.getElementById(id);
-const state={ws:null,symbol:'1HZ100V',prices:[],digits:Array(10).fill(0),stake:5,contract:'OVERUNDER',balance:10000,reconnect:null};
+const state={ws:null,symbol:'1HZ100V',prices:[],digits:Array(10).fill(0),stake:5,contract:'OVERUNDER',balance:10000,reconnect:null,pending:null,lastTick:null};
 const ui={price:$('price'),digit:$('digitBig'),confidence:$('confidence'),direction:$('direction'),grid:$('digitGrid'),strongest:$('strongestDigit'),strongestPct:$('strongestPct'),chart:$('chart'),connection:$('connection'),balance:$('balance'),payout:$('payout'),stake:$('stake')};
 const feeds=['wss://api.derivws.com/trading/v1/options/ws/public','wss://ws.binaryws.com/websockets/v3'];
 let feedIndex=0;
@@ -47,7 +47,9 @@ function onTick(t){
  const q=Number(t.quote);if(!Number.isFinite(q))return;
  state.prices.push(q);if(state.prices.length>120)state.prices.shift();
  const d=digit(q);if(d!==null)state.digits[d]++;
- ui.price.textContent=fmt(q);ui.digit.textContent=d===null?'—':d;drawChart();analyze();
+ ui.price.textContent=fmt(q);ui.digit.textContent=d===null?'—':d;
+ if(state.pending) settleDemo(q,d);
+ drawChart();analyze();state.lastTick=q;
 }
 function subscribe(ws){ws.send(JSON.stringify({ticks:state.symbol,subscribe:1,req_id:2}));ws.send(JSON.stringify({ticks_history:state.symbol,count:80,end:'latest',style:'ticks',req_id:3}));}
 function connect(){
@@ -72,7 +74,26 @@ function updateTradeLabels(){
 $('market').onchange=e=>{state.symbol=e.target.value;state.prices=[];state.digits=Array(10).fill(0);$('chartMarket').textContent=e.target.options[e.target.selectedIndex].text;try{state.ws.close()}catch(_){}connect()};
 document.querySelectorAll('[data-delta]').forEach(b=>b.onclick=()=>setStake(state.stake+Number(b.dataset.delta)));
 document.querySelectorAll('[data-stake]').forEach(b=>b.onclick=()=>setStake(Number(b.dataset.stake)));
-$('place').onclick=()=>{if(state.balance>=state.stake){state.balance-=state.stake;ui.balance.textContent='$'+state.balance.toFixed(2);toast('Demo trade placed — no real money used.')}else toast('Demo balance is too low.')};
+function placeDemo(side){
+ if(state.pending){toast('Wait for the current demo trade to settle.');return}
+ if(!Number.isFinite(state.lastTick)){toast('Waiting for live market data…');return}
+ if(state.balance<state.stake){toast('Demo balance is too low.');return}
+ state.balance-=state.stake;ui.balance.textContent='$'+state.balance.toFixed(2);
+ state.pending={side,entryPrice:state.lastTick,entryDigit:digit(state.lastTick),stake:state.stake};
+ toast(side+' demo trade placed — waiting for next tick.');
+}
+function settleDemo(price,nextDigit){
+ const t=state.pending;state.pending=null;
+ let win=false;
+ if(state.contract==='OVERUNDER') win=t.side==='OVER'?nextDigit>=4:nextDigit<=3;
+ else if(state.contract==='RISEFALL') win=t.side==='RISE'?price>t.entryPrice:price<t.entryPrice;
+ else win=t.side==='EVEN'?nextDigit%2===0:nextDigit%2===1;
+ if(win){const returned=t.stake*1.96;state.balance+=returned;ui.balance.textContent='$'+state.balance.toFixed(2);toast('Demo WIN — returned $'+returned.toFixed(2));}
+ else toast('Demo LOSS — next tick settled against the trade.');
+}
+$('over').onclick=()=>placeDemo($('leftTradeLabel').textContent);
+$('under').onclick=()=>placeDemo($('rightTradeLabel').textContent);
+$('place').onclick=()=>placeDemo($('leftTradeLabel').textContent);
 $('reset').onclick=()=>{state.balance=10000;ui.balance.textContent='$10,000.00';toast('Demo balance reset.')};
 $('analyze').onclick=()=>{analyze();toast('Analysis refreshed.')};
 window.addEventListener('resize',drawChart);
