@@ -30,3 +30,10 @@
 @media (max-width:380px) and (max-height:800px){
   .brand{font-size:24px}.demo-copy strong{font-size:17px}.selectors{grid-template-columns:1fr 1.55fr}.contract{font-size:8px}.summary-grid .panel{min-height:64px;padding:6px}.price-panel strong{font-size:16px}.prediction-panel strong{font-size:29px}.ai-panel strong{font-size:16px}.chart-wrap,.chart-wrap canvas{height:72px}.trade-panel{grid-template-columns:1fr 105px 1fr}.trade{font-size:12px;padding:8px 2px}.stake-control strong{font-size:11px}.place{font-size:7px}
 }
+.trade.selected{box-shadow:0 0 0 3px #fff8,0 0 18px #159fffaa;transform:translateY(-1px)}
+@media(max-width:760px){
+  .demo-card{margin-bottom:14px}
+  .summary-grid{padding-top:12px}
+  .digits-panel{margin-bottom:10px}
+  .trade-panel{margin-top:0}
+}
