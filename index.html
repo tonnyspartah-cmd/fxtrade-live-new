@@ -2,73 +2,106 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>FXTRADE.live — AI Market Analyzer</title>
-<meta name="description" content="FXTRADE.live AI Market Analyzer demo dashboard">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>FXTRADE.live — Demo Trading</title>
+<meta name="description" content="FXTRADE.live simple live market demo dashboard">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<div class="app">
-  <aside class="sidebar" id="sidebar">
-    <div class="brand"><div class="logo-mark">↗</div><div><div class="brand-name">FXTRADE<span>.live</span></div><div class="tagline">TRADE SMARTER • PROFIT MORE</div></div></div>
-    <nav>
-      <button class="nav active">⌂ <span>Home</span></button>
-      <button class="nav">◈ <span>Trade</span></button>
-      <button class="nav">◉ <span>AI Analyzer</span></button>
-      <button class="nav">◷ <span>History</span></button>
-      <button class="nav">▣ <span>Wallet</span></button>
-      <button class="nav">⚙ <span>Settings</span></button>
-      <button class="nav">? <span>Help</span></button>
-    </nav>
-    <div class="upgrade"><div class="crown">♛</div><b>Upgrade to Live Account</b><small>Get real market data, faster execution and more features.</small><button>Upgrade</button></div>
-  </aside>
+<div class="page">
+  <header class="header">
+    <div>
+      <div class="brand"><span>FX</span>TRADE<span class="live">.live</span></div>
+      <div class="tagline">Trade Smarter. Practice Today.</div>
+    </div>
+    <button class="menu" aria-label="Menu">☰</button>
+  </header>
 
-  <main class="main">
-    <header class="topbar">
-      <button id="menu" class="icon-btn">☰</button>
-      <div class="mobile-brand">FXTRADE<span>.live</span></div>
-      <div class="account"><span class="dot"></span><div><b>Demo Account</b><small id="balance">$9,890.66</small></div><span>⌄</span></div>
-      <button class="icon-btn">◔</button><button class="icon-btn">⚙</button>
-    </header>
-
-    <section class="content">
-      <section class="hero card">
-        <div class="robot">🤖<span>AI</span></div>
-        <div><div class="eyebrow">FXTRADE</div><h1>AI MARKET ANALYZER</h1><p>Real-time market analysis &nbsp;|&nbsp; Smart signals &nbsp;|&nbsp; Better decisions</p></div>
-        <div class="live"><i></i> Live Analysis</div>
-      </section>
-
-      <section class="controls card">
-        <label>Market<select id="market"><option value="1HZ100V">Volatility 100 (1s)</option><option value="1HZ75V">Volatility 75 (1s)</option><option value="1HZ50V">Volatility 50 (1s)</option><option value="1HZ25V">Volatility 25 (1s)</option><option value="1HZ10V">Volatility 10 (1s)</option></select></label>
-        <label>Contract Type<select><option>Over/Under</option></select></label>
-        <label>Candle Interval<select><option>1 Minute</option></select></label>
-        <label>Last Digit<div class="value" id="lastDigit">—</div></label>
-      </section>
-
-      <section class="signal card">
-        <div class="signal-main"><div class="check">✓</div><div><span>SIGNAL:</span><strong id="signalText">WAITING FOR DATA</strong><small id="signalSub">Connecting to the live market feed…</small></div></div>
-        <div class="recommend"><span>Recommended Direction</span><b id="direction">—</b></div>
-        <div class="risk"><span>Risk Level</span><b id="risk">—</b><small>Not 100% certain. Trade responsibly.</small></div>
-      </section>
-
-      <section class="info-grid">
-        <div class="card info-card"><div><span>Market</span><b>Volatility 100 (1s)</b></div><div><span>Current Price</span><b id="price">—</b></div><div><span>Last Digit</span><em id="digitBig">—</em></div></div>
-        <div class="card info-card"><div><span>Trend</span><b id="trend">WAITING</b></div><div><span>Momentum</span><b id="momentum">WAITING</b></div><div><span>Over/Under 3</span><b id="overUnder">—</b></div><div><span>AI Confidence</span><b id="confidence">—</b></div></div>
-        <div class="card why"><h3>Recommended Direction</h3><div class="why-dir" id="whyDir">—</div><span>Why?</span><p id="whyText">Waiting for enough live ticks to analyze the market.</p></div>
-      </section>
-
-      <section class="actions"><button id="analyze" class="primary">⌕ ANALYZE AGAIN</button><label class="auto">Auto Analysis <input id="auto" type="checkbox" checked><span></span></label><span class="connection" id="connection">● Connecting…</span></section>
-
-      <section class="lower-grid">
-        <div class="card digits"><h2>◉ Last Digit Prediction</h2><div class="digit-grid" id="digitGrid"></div><small id="distribution">Collecting distribution…</small></div>
-        <div class="card trade"><h2>Select Option</h2><div class="options"><button id="over" class="over active">↑ Over</button><button id="under" class="under">↓ Under</button></div><label>Stake (USD)<div class="stake"><button data-delta="-1">−</button><b id="stake">5</b><span>USD</span><button data-delta="1">+</button></div></label><div class="presets"><button data-stake="5">$5</button><button data-stake="10">$10</button><button data-stake="20">$20</button><button data-stake="50">$50</button></div><div class="payout"><span>Potential Payout</span><b id="payout">$9.80</b><small>(96%)</small></div><button id="place" class="place">↑ Place Trade</button><small class="demo-note">Demo interface only — no real trade is placed.</small></div>
-      </section>
-
-      <section class="card chart-card"><div class="chart-head"><div><h2>Volatility 100 (1s)</h2><small>Live tick chart • 1m view</small></div><span id="chartPrice">—</span></div><canvas id="chart" height="300"></canvas></section>
-
-      <footer><div><b>FXTRADE.live</b><span>TRADE SMARTER • PROFIT MORE</span></div><div>🛡 Secure Trading &nbsp; ⚡ Fast Execution &nbsp; ☎ 24/7 Support</div></footer>
+  <main>
+    <section class="demo-card">
+      <div class="wallet">▣</div>
+      <div class="demo-copy"><div>Demo Account <span class="info">i</span></div><strong id="balance">$10,000.00</strong></div>
+      <button id="reset" class="reset">↻ <span>Reset</span></button>
     </section>
+
+    <section class="selectors">
+      <div class="field market-field">
+        <label>Market</label>
+        <select id="market">
+          <option value="1HZ100V">Volatility 100 (1s)</option>
+          <option value="1HZ75V">Volatility 75 (1s)</option>
+          <option value="1HZ50V">Volatility 50 (1s)</option>
+          <option value="1HZ25V">Volatility 25 (1s)</option>
+          <option value="1HZ10V">Volatility 10 (1s)</option>
+        </select>
+      </div>
+      <div class="field contract-field">
+        <label>Contract Type</label>
+        <div class="contract-tabs">
+          <button class="contract active" data-contract="OVERUNDER">Over / Under</button>
+          <button class="contract" data-contract="RISEFALL">Rise / Fall</button>
+          <button class="contract" data-contract="EVENODD">Even / Odd</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="summary-grid">
+      <div class="panel price-panel">
+        <span>Current Price</span>
+        <strong id="price">—</strong>
+        <b id="change">Live</b>
+      </div>
+      <div class="panel prediction-panel">
+        <span>Prediction Digit</span>
+        <strong id="digitBig">—</strong>
+        <small>Next tick (1s)</small>
+      </div>
+      <div class="panel ai-panel">
+        <span>🤖 FXTRADE AI SIGNAL</span>
+        <strong id="direction">WAIT</strong>
+        <b>Confidence: <em id="confidence">—</em></b>
+        <small>Based on live market data</small>
+      </div>
+    </section>
+
+    <section class="panel digits-panel">
+      <div class="panel-title">
+        <div><b>▮▮▮</b><h2>Last Digit Analysis</h2></div>
+        <div class="strongest">Strongest Digit <strong id="strongestDigit">—</strong> <em id="strongestPct">—</em></div>
+      </div>
+      <div class="digit-grid" id="digitGrid"></div>
+    </section>
+
+    <section class="panel chart-panel">
+      <div class="chart-head">
+        <div><h2>Live Chart</h2><small id="chartMarket">Volatility 100 (1s)</small></div>
+        <div class="time-tabs"><button class="active">1m</button><button>3m</button><button>5m</button></div>
+      </div>
+      <div class="chart-wrap"><canvas id="chart" height="300"></canvas></div>
+    </section>
+
+    <section class="trade-panel">
+      <div class="trade-side over-side">
+        <button id="over" class="trade over">↑ <span id="leftTradeLabel">OVER</span></button>
+        <small id="leftRule">Digits 4 - 9</small>
+      </div>
+      <div class="stake-box">
+        <label>Stake (USD)</label>
+        <div class="stake-control"><button data-delta="-1">−</button><strong id="stake">5</strong><button data-delta="1">+</button></div>
+        <div class="presets"><button data-stake="5">$5</button><button data-stake="10">$10</button><button data-stake="20">$20</button><button data-stake="50">$50</button></div>
+        <div class="payout">Potential payout <strong id="payout">$9.80</strong></div>
+        <button id="place" class="place">Place Demo Trade</button>
+      </div>
+      <div class="trade-side under-side">
+        <button id="under" class="trade under">↓ <span id="rightTradeLabel">UNDER</span></button>
+        <small id="rightRule">Digits 0 - 3</small>
+      </div>
+    </section>
+
+    <div class="status-row"><span id="connection">● Connecting…</span><button id="analyze">Analyze</button></div>
   </main>
+
+  <footer><b><span>FX</span>TRADE.live</b><span>Practice. Learn. Improve.</span></footer>
 </div>
 <div id="toast" class="toast"></div>
 <script src="app.js"></script>
