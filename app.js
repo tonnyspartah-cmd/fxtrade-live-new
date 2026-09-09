@@ -2,7 +2,7 @@
 'use strict';
 const $=id=>document.getElementById(id);
 const state={ws:null,symbol:'1HZ100V',prices:[],digits:Array(10).fill(0),stake:5,contract:'OVERUNDER',balance:10000,reconnect:null,pending:null,stats:{trades:0,wins:0,losses:0}};
-const ui={price:$('price'),digit:$('digitBig'),confidence:$('confidence'),direction:$('direction'),grid:$('digitGrid'),strongest:$('strongestDigit'),strongestPct:$('strongestPct'),connection:$('connection'),balance:$('balance'),payout:$('payout'),stake:$('stake')};
+const ui={price:$('price'),digit:$('digitBig'),confidence:$('confidence'),direction:$('direction'),aiReason:$('aiReason'),grid:$('digitGrid'),strongest:$('strongestDigit'),strongestPct:$('strongestPct'),connection:$('connection'),balance:$('balance'),payout:$('payout'),stake:$('stake')};
 const feeds=['wss://api.derivws.com/trading/v1/options/ws/public','wss://ws.binaryws.com/websockets/v3'];
 let feedIndex=0;
 
@@ -13,19 +13,32 @@ function setConn(t,ok=false){ui.connection.textContent='● '+t;ui.connection.st
 
 function analyze(){
  if(state.prices.length<8)return;
- const p=state.prices.slice(-30),a=p[0],b=p.at(-1),delta=b-a,half=Math.floor(p.length/2);
- const av1=p.slice(0,half).reduce((s,v)=>s+v,0)/half,av2=p.slice(half).reduce((s,v)=>s+v,0)/(p.length-half);
+ const p=state.prices.slice(-30),a=p[0],b=p.at(-1),delta=b-a,half=Math.max(2,Math.floor(p.length/2));
+ const av1=p.slice(0,half).reduce((s,v)=>s+v,0)/half,av2=p.slice(-half).reduce((s,v)=>s+v,0)/half;
  const bull=delta>0&&av2>=av1,bear=delta<0&&av2<=av1;
- const dir=bull?'OVER':bear?'UNDER':'WAIT';
- const conf=Math.min(95,Math.max(55,Math.round(55+Math.min(40,Math.abs(delta/Math.max(a,1))*100000*6))));
- ui.direction.textContent=state.contract==='RISEFALL'?(bull?'RISE':bear?'FALL':'WAIT'):state.contract==='EVENODD'?'DIGIT '+(mostEven()?'EVEN':'ODD'):dir;
+ let result;
+ if(typeof analyzeAISignal==='function'){
+   const ds=p.map(digit).filter(d=>d!==null);
+   result=analyzeAISignal(ds);
+ }
+ const dir=result?.direction || (bull?'OVER':bear?'UNDER':'WAIT');
+ const conf=result?.confidence ?? Math.min(95,Math.max(55,Math.round(55+Math.min(40,Math.abs(delta/Math.max(a,1))*100000*6))));
+ let display=dir;
+ if(state.contract==='RISEFALL') display=bull?'RISE':bear?'FALL':'WAIT';
+ else if(state.contract==='EVENODD') display='DIGIT '+(mostEven()?'EVEN':'ODD');
+ ui.direction.textContent=display;
  ui.confidence.textContent=conf+'%';
+ if(ui.aiReason) ui.aiReason.textContent=result ? result.reason : 'Waiting for live market data';
  updateDigits();
 }
 function mostEven(){let e=0,o=0;for(let i=0;i<10;i++){if(i%2)o+=state.digits[i];else e+=state.digits[i]}return e>=o}
 function updateDigits(){
- const total=state.digits.reduce((a,b)=>a+b,0);if(!total)return;
- const probs=state.digits.map(n=>n/total*100),hi=probs.indexOf(Math.max(...probs));
+ const ds=state.prices.slice(-30).map(digit).filter(d=>d!==null);
+ if(!ds.length)return;
+ const weights=Array(10).fill(0);
+ ds.forEach((d,i)=>{weights[d]+=1+(i/Math.max(1,ds.length-1))*1.5});
+ const total=weights.reduce((a,b)=>a+b,0);
+ const probs=weights.map(n=>n/total*100),hi=probs.indexOf(Math.max(...probs));
  ui.grid.innerHTML=probs.map((v,i)=>`<div class="digit ${i===hi?'high':''}"><b>${i}</b><small>${v.toFixed(1)}%</small></div>`).join('');
  ui.strongest.textContent=hi;ui.strongestPct.textContent='('+probs[hi].toFixed(1)+'%)';ui.digit.textContent=hi;
 }
@@ -91,7 +104,13 @@ function updateTradeLabels(){
 $('market').onchange=e=>{state.symbol=e.target.value;state.prices=[];state.digits=Array(10).fill(0);try{state.ws.close()}catch(_){}connect()};
 document.querySelectorAll('[data-delta]').forEach(b=>b.onclick=()=>setStake(state.stake+Number(b.dataset.delta)));
 document.querySelectorAll('[data-stake]').forEach(b=>b.onclick=()=>setStake(Number(b.dataset.stake)));
-$('place').onclick=()=>startDemoTrade('left');
+$('place').onclick=()=>{
+ const ds=state.prices.slice(-30).map(digit).filter(d=>d!==null);
+ const ai=typeof analyzeAISignal==='function'?analyzeAISignal(ds):null;
+ if(ai?.direction==='OVER') startDemoTrade('left');
+ else if(ai?.direction==='UNDER') startDemoTrade('right');
+ else toast('AI says WAIT — no demo trade placed.');
+};
 $('over').onclick=()=>startDemoTrade('left');
 $('under').onclick=()=>startDemoTrade('right');
 $('reset').onclick=()=>{state.balance=10000;state.pending=null;state.stats={trades:0,wins:0,losses:0};ui.balance.textContent='$10,000.00';updateStats();toast('Demo balance reset.')};
