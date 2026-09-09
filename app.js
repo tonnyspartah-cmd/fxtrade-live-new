@@ -54,13 +54,74 @@
     drawChart(); if($('auto').checked)analyze();
   }
 
+  const FEEDS = [
+    'wss://api.derivws.com/trading/v1/options/ws/public',
+    'wss://ws.binaryws.com/websockets/v3'
+  ];
+  let feedIndex = 0;
+  let feedFallbackTimer = null;
+
+  function subscribeFeed(ws){
+    ws.send(JSON.stringify({active_symbols:'brief',product_type:'basic',req_id:1}));
+    ws.send(JSON.stringify({ticks:state.symbol,subscribe:1,req_id:2}));
+    ws.send(JSON.stringify({ticks_history:state.symbol,count:80,end:'latest',style:'ticks',req_id:3}));
+  }
+
   function connect(){
-    clearTimeout(state.reconnectTimer); setConnection('Connecting…');
-    try{state.ws=new WebSocket('wss://ws.binaryws.com/websockets/v3');}catch(e){setConnection('Unavailable');return}
-    state.ws.onopen=()=>{setConnection('Live market connected',true);state.ws.send(JSON.stringify({ticks:state.symbol,subscribe:1,req_id:1}));state.ws.send(JSON.stringify({ticks_history:state.symbol,count:80,end:'latest',style:'ticks',req_id:2}));};
-    state.ws.onmessage=e=>{try{const d=JSON.parse(e.data);if(d.error){setConnection('Feed error');return}if(d.msg_type==='history'&&d.history?.prices){d.history.prices.map(Number).filter(Number.isFinite).forEach(v=>{state.prices.push(v);const dig=Number(lastDigit(v));if(Number.isInteger(dig))state.digits[dig]++});state.prices=state.prices.slice(-120);drawChart();analyze()}if(d.msg_type==='tick'&&d.tick)onTick(d.tick)}catch(err){console.error(err)}};
-    state.ws.onerror=()=>setConnection('Connection error');
-    state.ws.onclose=()=>{setConnection('Reconnecting…');state.reconnectTimer=setTimeout(connect,3000)};
+    clearTimeout(state.reconnectTimer);
+    clearTimeout(feedFallbackTimer);
+    setConnection('Connecting…');
+    const url=FEEDS[feedIndex];
+    try{state.ws=new WebSocket(url);}catch(e){setConnection('Feed unavailable');return}
+    let opened=false;
+    state.ws.onopen=()=>{
+      opened=true;
+      clearTimeout(feedFallbackTimer);
+      setConnection('Live market connected',true);
+      subscribeFeed(state.ws);
+    };
+    feedFallbackTimer=setTimeout(()=>{
+      if(!opened && feedIndex<FEEDS.length-1){
+        try{state.ws.close();}catch(_){}
+        feedIndex++;
+        connect();
+      }
+    },5000);
+    state.ws.onmessage=e=>{
+      try{
+        const d=JSON.parse(e.data);
+        if(d.error){
+          console.warn('Deriv feed error',d.error);
+          if(!opened && feedIndex<FEEDS.length-1){try{state.ws.close();}catch(_){} feedIndex++; connect(); return}
+          setConnection('Feed error');
+          return;
+        }
+        if(d.msg_type==='history'&&d.history?.prices){
+          d.history.prices.map(Number).filter(Number.isFinite).forEach(v=>{
+            state.prices.push(v);
+            const dig=Number(lastDigit(v));
+            if(Number.isInteger(dig))state.digits[dig]++;
+          });
+          state.prices=state.prices.slice(-120);
+          drawChart(); analyze();
+        }
+        if(d.msg_type==='tick'&&d.tick)onTick(d.tick);
+      }catch(err){console.error('Feed message error',err)}
+    };
+    state.ws.onerror=()=>{
+      if(!opened && feedIndex<FEEDS.length-1){
+        feedIndex++;
+        try{state.ws.close();}catch(_){}
+        connect();
+      }else setConnection('Connection error');
+    };
+    state.ws.onclose=()=>{
+      clearTimeout(feedFallbackTimer);
+      if(opened){
+        setConnection('Reconnecting…');
+        state.reconnectTimer=setTimeout(connect,3000);
+      }
+    };
   }
 
   $('market').addEventListener('change',e=>{state.symbol=e.target.value;state.prices=[];state.digits=Array(10).fill(0);if(state.ws)state.ws.close();connect()});
