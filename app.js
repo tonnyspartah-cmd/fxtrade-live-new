@@ -1,0 +1,6 @@
+const probs=[10.8,10.2,8.7,10.7,9.8,9.3,10.4,9.7,10.7,9.7];
+function renderDigits(){const el=document.getElementById('digits');el.innerHTML=probs.map((p,i)=>`<div class="digit-box ${i===0?'hot':''}"><b>${i}</b><span>${p}%</span></div>`).join('')}
+function analyze(){document.querySelector('.signal h2').textContent='ANALYZING...';setTimeout(()=>{document.querySelector('.signal h2').textContent='SETUP READY';drawChart()},600)}
+function placeTrade(){document.getElementById('tradeMsg').textContent='Demo mode: trade request simulated.'}
+function drawChart(){const c=document.getElementById('chart'),ctx=c.getContext('2d');const dpr=devicePixelRatio||1;c.width=c.clientWidth*dpr;c.height=260*dpr;ctx.scale(dpr,dpr);ctx.strokeStyle='#07538e';ctx.lineWidth=1;for(let y=20;y<250;y+=35){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(c.clientWidth,y);ctx.stroke()}for(let x=0;x<c.clientWidth;x+=55){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,260);ctx.stroke()}let y=190;for(let x=8;x<c.clientWidth-10;x+=12){const ny=y+(Math.random()-.48)*28;y=ny;ctx.strokeStyle=ny<y?'#00ef9a':'#ff3e62';ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+8,ny);ctx.stroke();ctx.beginPath();ctx.moveTo(x+4,Math.min(y,ny)-8);ctx.lineTo(x+4,Math.max(y,ny)+8);ctx.stroke();}}
+renderDigits();drawChart();window.addEventListener('resize',drawChart);
