@@ -15,3 +15,18 @@
 @media (max-width:380px) and (max-height:800px){
   .chart-wrap,.chart-wrap canvas{height:85px}.summary-grid .panel{min-height:68px}.digits-panel{padding:6px}.digit{padding:3px 1px}.trade-panel{grid-template-columns:1fr 115px 1fr}.trade{padding:9px 3px}
 }
+/* Final mobile fit: keep the complete dashboard visible in one screen */
+@media (max-width:760px) and (max-height:900px){
+  .header{padding:6px 12px 4px}
+  .brand{font-size:26px}.tagline{font-size:10px}.menu{font-size:23px}
+  .demo-card{margin:5px 10px 6px;padding:7px 9px;gap:7px}.wallet{font-size:21px}.demo-copy{font-size:10px}.demo-copy strong{font-size:19px}.reset{padding:5px 8px;font-size:10px}
+  .selectors{grid-template-columns:1fr 1.65fr;padding:0 10px;gap:6px}.field label{font-size:10px;margin-bottom:2px}.field select{height:32px;font-size:10px;padding:0 7px}.contract-tabs{height:32px}.contract{font-size:9px;padding:0 2px}
+  .summary-grid{grid-template-columns:1fr 1fr 1fr;gap:5px;padding:6px 10px 5px}.summary-grid .panel{min-height:70px;padding:7px 8px;border-radius:9px}.summary-grid span{font-size:9px}.price-panel strong{font-size:18px;margin:4px 0 1px}.price-panel b{font-size:9px}.prediction-panel strong{font-size:32px;margin:0}.prediction-panel small,.ai-panel small{font-size:8px}.ai-panel{grid-column:auto}.ai-panel span{font-size:8px}.ai-panel strong{font-size:18px;margin:2px 0}.ai-panel b{font-size:9px}
+  .digits-panel{margin:0 10px 5px;padding:7px}.panel-title h2,.chart-head h2{font-size:12px}.strongest{font-size:8px}.strongest strong{padding:2px 4px}.digit-grid{grid-template-columns:repeat(10,1fr);gap:2px;margin-top:5px}.digit{padding:3px 0;border-radius:4px}.digit b{font-size:11px}.digit small{font-size:7px;margin-top:0}
+  .chart-panel{margin:0 10px 5px;padding:7px}.chart-head small,.time-tabs{display:none}.chart-wrap{margin-top:4px;height:88px}.chart-wrap canvas{height:88px}
+  .trade-panel{margin:0 7px 4px;padding:5px;grid-template-columns:1fr 115px 1fr;gap:4px}.trade{padding:9px 3px;font-size:14px}.trade-side small{font-size:7px}.stake-box label{font-size:8px}.stake-control button{width:21px;height:23px;font-size:15px}.stake-control strong{font-size:12px}.presets{margin-top:2px}.presets button{font-size:7px;padding:2px}.payout{font-size:7px;margin:2px 0}.payout strong{font-size:9px}.place{padding:4px;font-size:8px}
+  .status-row{padding:0 10px 3px;font-size:8px}.status-row button{padding:2px 5px;font-size:7px}footer{display:none}
+}
+@media (max-width:380px) and (max-height:800px){
+  .brand{font-size:24px}.demo-copy strong{font-size:17px}.selectors{grid-template-columns:1fr 1.55fr}.contract{font-size:8px}.summary-grid .panel{min-height:64px;padding:6px}.price-panel strong{font-size:16px}.prediction-panel strong{font-size:29px}.ai-panel strong{font-size:16px}.chart-wrap,.chart-wrap canvas{height:72px}.trade-panel{grid-template-columns:1fr 105px 1fr}.trade{font-size:12px;padding:8px 2px}.stake-control strong{font-size:11px}.place{font-size:7px}
+}
