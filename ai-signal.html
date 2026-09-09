@@ -1,0 +1,22 @@
+<!-- Replace only the contents of your existing AI signal card if needed.
+     Keep your current CSS/layout. These IDs let the JS update the existing card. -->
+
+<div class="ai-signal-card">
+  <div class="ai-title">FXTRADE AI SIGNAL</div>
+  <div id="ai-signal">WAIT</div>
+  <div id="ai-confidence">Confidence: 0%</div>
+  <div id="ai-strength">WAIT</div>
+  <div id="ai-reason">Waiting for live tick data.</div>
+</div>
+
+<script src="./ai-signal.js"></script>
+
+<script>
+  // Call this whenever a new tick arrives.
+  // Example: updateAISignal([5,4,7,6,9,2,8,6,5,4]);
+
+  function updateAISignal(latestDigits) {
+    const result = analyzeAISignal(latestDigits);
+    renderAISignal(result);
+  }
+</script>
