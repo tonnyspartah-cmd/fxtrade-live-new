@@ -75,7 +75,7 @@
     <section class="panel chart-panel">
       <div class="chart-head">
         <div><h2>Live Chart</h2><small id="chartMarket">Volatility 100 (1s)</small></div>
-        <div class="time-tabs"><button class="active">1m</button><button>3m</button><button>5m</button></div>
+        <div class="time-tabs"><button class="active">1m</button><button>3m</button><button>5m</button><button>15m</button></div>
       </div>
       <div class="chart-wrap"><canvas id="chart" height="300"></canvas></div>
     </section>
@@ -88,9 +88,6 @@
       <div class="stake-box">
         <label>Stake (USD)</label>
         <div class="stake-control"><button data-delta="-1">−</button><strong id="stake">5</strong><button data-delta="1">+</button></div>
-        <div class="presets"><button data-stake="5">$5</button><button data-stake="10">$10</button><button data-stake="20">$20</button><button data-stake="50">$50</button></div>
-        <div class="payout">Potential payout <strong id="payout">$9.80</strong></div>
-        <button id="place" class="place">Place Demo Trade</button>
       </div>
       <div class="trade-side under-side">
         <button id="under" class="trade under">↓ <span id="rightTradeLabel">UNDER</span></button>
