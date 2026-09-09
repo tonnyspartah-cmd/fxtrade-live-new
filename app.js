@@ -2,7 +2,7 @@
 'use strict';
 const $=id=>document.getElementById(id);
 const state={ws:null,symbol:'1HZ100V',prices:[],digits:Array(10).fill(0),stake:5,contract:'OVERUNDER',balance:10000,reconnect:null};
-const ui={price:$('price'),digit:$('digitBig'),confidence:$('confidence'),direction:$('direction'),grid:$('digitGrid'),strongest:$('strongestDigit'),strongestPct:$('strongestPct'),chart:$('chart'),connection:$('connection'),balance:$('balance'),stake:$('stake')};
+const ui={price:$('price'),digit:$('digitBig'),confidence:$('confidence'),direction:$('direction'),grid:$('digitGrid'),strongest:$('strongestDigit'),strongestPct:$('strongestPct'),chart:$('chart'),connection:$('connection'),balance:$('balance'),payout:$('payout'),stake:$('stake')};
 const feeds=['wss://api.derivws.com/trading/v1/options/ws/public','wss://ws.binaryws.com/websockets/v3'];
 let feedIndex=0;
 
@@ -61,7 +61,7 @@ function connect(){
  ws.onclose=()=>{if(opened){setConn('Reconnecting…');state.reconnect=setTimeout(connect,3000)}};
 }
 
-function setStake(v){state.stake=Math.max(1,Math.min(100,v));ui.stake.textContent=state.stake}
+function setStake(v){state.stake=Math.max(1,Math.min(100,v));ui.stake.textContent=state.stake;ui.payout.textContent='$'+(state.stake*1.96).toFixed(2)}
 document.querySelectorAll('.contract').forEach(b=>b.onclick=()=>{document.querySelectorAll('.contract').forEach(x=>x.classList.remove('active'));b.classList.add('active');state.contract=b.dataset.contract;updateTradeLabels();analyze()});
 function updateTradeLabels(){
  const l=$('leftTradeLabel'),r=$('rightTradeLabel'),lr=$('leftRule'),rr=$('rightRule');
@@ -71,9 +71,8 @@ function updateTradeLabels(){
 }
 $('market').onchange=e=>{state.symbol=e.target.value;state.prices=[];state.digits=Array(10).fill(0);$('chartMarket').textContent=e.target.options[e.target.selectedIndex].text;try{state.ws.close()}catch(_){}connect()};
 document.querySelectorAll('[data-delta]').forEach(b=>b.onclick=()=>setStake(state.stake+Number(b.dataset.delta)));
-$('over').onclick=()=>demoTrade('OVER');
-$('under').onclick=()=>demoTrade('UNDER');
-function demoTrade(side){if(state.balance>=state.stake){state.balance-=state.stake;ui.balance.textContent='$'+state.balance.toFixed(2);toast(side+' demo trade placed — no real money used.')}else toast('Demo balance is too low.')} 
+document.querySelectorAll('[data-stake]').forEach(b=>b.onclick=()=>setStake(Number(b.dataset.stake)));
+$('place').onclick=()=>{if(state.balance>=state.stake){state.balance-=state.stake;ui.balance.textContent='$'+state.balance.toFixed(2);toast('Demo trade placed — no real money used.')}else toast('Demo balance is too low.')};
 $('reset').onclick=()=>{state.balance=10000;ui.balance.textContent='$10,000.00';toast('Demo balance reset.')};
 $('analyze').onclick=()=>{analyze();toast('Analysis refreshed.')};
 window.addEventListener('resize',drawChart);
