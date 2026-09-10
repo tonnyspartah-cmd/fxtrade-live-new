@@ -2,7 +2,11 @@
 'use strict';
 const $=id=>document.getElementById(id);
 const state={ws:null,symbol:'1HZ100V',prices:[],digits:Array(10).fill(0),stake:5,contract:'OVERUNDER',balance:10000,reconnect:null,pending:null,stats:{trades:0,wins:0,losses:0}};
-const ui={price:$('price'),digit:$('digitBig'),confidence:$('confidence'),direction:$('direction'),grid:$('digitGrid'),strongest:$('strongestDigit'),strongestPct:$('strongestPct'),connection:$('connection'),balance:$('balance'),payout:$('payout'),stake:$('stake')};
+const DERIV_CLIENT_ID='34m6kBZ1JQGXBHSscpXxQ';
+const DERIV_REDIRECT_URI=window.location.origin+'/';
+const DERIV_API='https://api.derivws.com';
+const auth={token:sessionStorage.getItem('deriv_access_token')||null,accountId:sessionStorage.getItem('deriv_account_id')||null,ws:null};
+const ui={price:$('price'),digit:$('digitBig'),confidence:$('confidence'),direction:$('direction'),grid:$('digitGrid'),strongest:$('strongestDigit'),strongestPct:$('strongestPct'),connection:$('connection'),balance:$('balance'),payout:$('payout'),stake:$('stake'),connect:$('connectDeriv')};
 const marketSelect=$('market');
 const feeds=['wss://api.derivws.com/trading/v1/options/ws/public','wss://ws.binaryws.com/websockets/v3'];
 const fallbackVolatilities=[
@@ -79,6 +83,16 @@ function connect(){
  ws.onclose=()=>{if(opened){setConn('Reconnecting…');state.reconnect=setTimeout(connect,3000)}};
 }
 
+function base64Url(bytes){return btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}
+async function sha256Base64Url(text){const hash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));return base64Url(new Uint8Array(hash))}
+function randomString(len=64){const chars='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';const a=new Uint8Array(len);crypto.getRandomValues(a);return Array.from(a,v=>chars[v%chars.length]).join('')}
+function randomState(){const a=new Uint8Array(16);crypto.getRandomValues(a);return Array.from(a,v=>v.toString(16).padStart(2,'0')).join('')}
+async function startDerivOAuth(){const verifier=randomString(64),stateValue=randomState();sessionStorage.setItem('pkce_code_verifier',verifier);sessionStorage.setItem('oauth_state',stateValue);const challenge=await sha256Base64Url(verifier);const u=new URL('https://auth.deriv.com/oauth2/auth');u.searchParams.set('response_type','code');u.searchParams.set('client_id',DERIV_CLIENT_ID);u.searchParams.set('redirect_uri',DERIV_REDIRECT_URI);u.searchParams.set('scope','trade');u.searchParams.set('state',stateValue);u.searchParams.set('code_challenge',challenge);u.searchParams.set('code_challenge_method','S256');window.location.href=u.toString()}
+async function finishDerivOAuth(){const q=new URLSearchParams(location.search),code=q.get('code'),returnedState=q.get('state');if(!code)return;if(returnedState!==sessionStorage.getItem('oauth_state')){toast('Deriv login verification failed.');return}const verifier=sessionStorage.getItem('pkce_code_verifier');try{const r=await fetch('/api/oauth/token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,code_verifier:verifier,redirect_uri:DERIV_REDIRECT_URI,client_id:DERIV_CLIENT_ID})});const data=await r.json();if(!r.ok||!data.access_token)throw new Error(data.error||'Token exchange failed');auth.token=data.access_token;sessionStorage.setItem('deriv_access_token',auth.token);sessionStorage.removeItem('pkce_code_verifier');sessionStorage.removeItem('oauth_state');history.replaceState({},'',location.pathname);await connectDerivAccount()}catch(e){toast('Deriv connection failed.');console.error(e)}}
+async function connectDerivAccount(){if(!auth.token)return;try{const r=await fetch(DERIV_API+'/trading/v1/options/accounts',{headers:{Authorization:'Bearer '+auth.token}});const data=await r.json();if(!r.ok)throw new Error(data?.errors?.[0]?.message||'Account lookup failed');const accounts=data.data?.accounts||data.data||[];const demo=Array.isArray(accounts)?accounts.find(a=>String(a.account_type||a.type||'').toLowerCase()==='demo')||accounts[0]:null;if(!demo?.account_id)throw new Error('No Deriv Options account found');auth.accountId=demo.account_id;sessionStorage.setItem('deriv_account_id',auth.accountId);const otp=await fetch(DERIV_API+'/trading/v1/options/accounts/'+encodeURIComponent(auth.accountId)+'/otp',{method:'POST',headers:{Authorization:'Bearer '+auth.token}});const od=await otp.json();if(!otp.ok||!od.data?.url)throw new Error(od?.errors?.[0]?.message||'Could not create WebSocket session');openAuthenticatedWebSocket(od.data.url)}catch(e){toast(e.message||'Deriv account connection failed.');console.error(e)}}
+function openAuthenticatedWebSocket(url){try{auth.ws?.close()}catch(_){}auth.ws=new WebSocket(url);auth.ws.onopen=()=>{setConn('Deriv demo connected',true);if(ui.connect){ui.connect.textContent='Deriv Connected';ui.connect.classList.add('connected')}auth.ws.send(JSON.stringify({balance:1,subscribe:1,req_id:501}));auth.ws.send(JSON.stringify({ticks:state.symbol,subscribe:1,req_id:502}))};auth.ws.onmessage=e=>{try{const d=JSON.parse(e.data);if(d.msg_type==='balance'&&d.balance){ui.balance.textContent='$'+Number(d.balance.balance).toFixed(2);state.balance=Number(d.balance.balance)}if(d.msg_type==='tick'&&d.tick)onTick(d.tick)}catch(_){}};auth.ws.onerror=()=>setConn('Deriv connection error');auth.ws.onclose=()=>{if(ui.connect){ui.connect.textContent='Connect Deriv';ui.connect.classList.remove('connected')}}}
+function refreshDerivSession(){if(auth.token&&!auth.ws)connectDerivAccount()}
+
 function updateStats(){
  const t=$('totalTrades'),w=$('wins'),l=$('losses');
  if(t)t.textContent=state.stats.trades; if(w)w.textContent=state.stats.wins; if(l)l.textContent=state.stats.losses;
@@ -133,5 +147,8 @@ $('over').onclick=()=>startDemoTrade('left');
 $('under').onclick=()=>startDemoTrade('right');
 $('reset').onclick=()=>{state.balance=10000;state.pending=null;state.stats={trades:0,wins:0,losses:0};ui.balance.textContent='$10,000.00';updateStats();toast('Demo balance reset.')};
 $('analyze').onclick=()=>{analyze();toast('Analysis refreshed.')};
+if(ui.connect)ui.connect.onclick=()=>{if(auth.token)connectDerivAccount();else startDerivOAuth()};
 setStake(5);updateTradeLabels();updateStats();connect();
+finishDerivOAuth();
+refreshDerivSession();
 })();

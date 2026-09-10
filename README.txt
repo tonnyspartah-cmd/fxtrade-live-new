@@ -1,25 +1,22 @@
-FXTRADE.live AI Signal Upgrade
+FXTRADE.live — Deriv OAuth connection
 
-Files:
-- ai-signal.js  -> signal calculation
-- ai-signal.html -> example integration
+This version keeps the existing FXTRADE.live design and AI signal and adds a Deriv OAuth connection layer.
 
-What it does:
-- OVER/UNDER probability
-- Recent tick weighting
-- Momentum check
-- Most frequent prediction digit
-- Dynamic confidence
-- STRONG / MEDIUM / WAIT
-- Explanation/reason text
+Included:
+- Deriv OAuth 2.0 + PKCE login
+- Server-side OAuth token exchange at /api/oauth/token
+- Demo Options account lookup
+- Authenticated Deriv demo WebSocket session via OTP
+- Live Deriv demo balance shown after connection
+- Authenticated tick stream used alongside the existing public market feed
+
+Deriv app settings used:
+- App name: fxtrade_live
+- Scope: trade
+- Redirect URL: https://fxtrade-live-new.vercel.app/
+- Markup: 3%
 
 Important:
-This is an analysis engine, not a guaranteed predictor. Binary/last-tick markets remain uncertain.
-
-Integration:
-1. Copy ai-signal.js into your website project.
-2. Load it from the page containing your existing AI card.
-3. When your live tick stream updates, call:
-   updateAISignal([latest digits...])
-
-Keep your existing CSS and layout unchanged.
+- The Deriv App ID is included in app.js because it is a client identifier, not a secret.
+- No password, PIN, or personal access token is stored in this project.
+- The existing Place Demo Trade button is still the site's local demo settlement. Real Deriv contract purchase is intentionally the next integration step after confirming OAuth/account connection works.

@@ -37,3 +37,7 @@
   .digits-panel{margin-bottom:10px}
   .trade-panel{margin-top:0}
 }
+
+/* Deriv connection: same visual language, no redesign */
+.account-actions{margin-left:auto;display:flex;gap:8px;align-items:center}.connect-deriv{background:#078eff;border-color:#20a5ff;color:#fff}.connect-deriv.connected{background:#063329;border-color:#1ee18b;color:#2ce795}
+@media(max-width:760px){.account-actions{gap:5px}.connect-deriv{padding:7px 8px;font-size:10px}.account-actions .reset{padding:7px 8px;font-size:10px}}
