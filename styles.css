@@ -41,3 +41,11 @@
 /* Deriv connection: same visual language, no redesign */
 .account-actions{margin-left:auto;display:flex;gap:8px;align-items:center}.connect-deriv{background:#078eff;border-color:#20a5ff;color:#fff}.connect-deriv.connected{background:#063329;border-color:#1ee18b;color:#2ce795}
 @media(max-width:760px){.account-actions{gap:5px}.connect-deriv{padding:7px 8px;font-size:10px}.account-actions .reset{padding:7px 8px;font-size:10px}}
+
+.account-actions{display:flex;align-items:center;gap:8px;margin-left:auto}
+.account-type{height:46px;border:1px solid #147fcf;border-radius:12px;background:#071b2d;color:#eef7ff;padding:0 12px;font-weight:800}
+.connect-deriv.connected{border-color:#20df8b;color:#2ce795}
+@media(max-width:760px){
+  .account-actions{gap:5px}
+  .account-type{height:34px;padding:0 7px;font-size:10px;border-radius:8px}
+}
