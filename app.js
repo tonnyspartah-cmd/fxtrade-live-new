@@ -2,7 +2,7 @@
 'use strict';
 const $=id=>document.getElementById(id);
 const state={ws:null,symbol:'1HZ100V',prices:[],digits:Array(10).fill(0),stake:5,contract:'OVERUNDER',balance:10000,reconnect:null,pending:null,stats:{trades:0,wins:0,losses:0}};
-const DERIV_CLIENT_ID='34m6kBZ1JQGXBHSscpXxQ';
+const DERIV_CLIENT_ID='34m6kBZ1JQGXBHSscpXXQ';
 const DERIV_REDIRECT_URI=window.location.origin+'/';
 const DERIV_API='https://api.derivws.com';
 const auth={token:sessionStorage.getItem('deriv_access_token')||null,accountId:sessionStorage.getItem('deriv_account_id')||null,ws:null};
