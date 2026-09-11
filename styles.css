@@ -29,30 +29,9 @@ main{padding:0 10px}
 .bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(520px,100%);height:64px;background:linear-gradient(180deg,#4820a6,#35158c);border-top:1px solid #7748c7;display:grid;grid-template-columns:repeat(3,1fr);z-index:5}.nav-item{position:relative;border:0;background:transparent;color:#bfb1e6;font-size:9px}.nav-item span{display:block;font-size:19px;margin-bottom:2px}.nav-item.active{color:#ff72dc}.nav-item i{position:absolute;top:7px;margin-left:2px;background:#ff3d5e;color:#fff;border-radius:9px;font-size:7px;padding:2px 4px;font-style:normal}
 .toast{position:fixed;left:50%;bottom:76px;transform:translate(-50%,20px);opacity:0;background:#1f0e59;border:1px solid #9d62e7;padding:8px 12px;border-radius:8px;font-size:10px;transition:.2s;z-index:20}.toast.show{transform:translate(-50%,0);opacity:1}
 @media(min-width:700px){.app-shell{box-shadow:0 0 40px #16074a}.bottom-nav{position:fixed}
-                        const probs = [10.8,10.2,8.7,10.7,9.8,9.3,10.4,9.7,10.7,9.7];
 
-let cursorDigit = 0;
 
-function renderDigits(){
-  const el = document.getElementById('digits');
-
-  el.innerHTML = probs.map((p,i) => `
-    <div class="digit-box ${i === cursorDigit ? 'hot' : ''}">
-      <b>${i}</b>
-      <span>${p}%</span>
-    </div>
-  `).join('');
-}
-
-function moveDigitCursor(){
-  cursorDigit = (cursorDigit + 1) % 10;
-  renderDigits();
-}
-
-renderDigits();
-
-setInterval(moveDigitCursor, 1000);
-.digit {
+.digit-box{
   position: relative;
 }
 
