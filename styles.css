@@ -44,7 +44,7 @@ main{padding:0 10px}
   border-radius: 3px;
   background: #00e5ff;
   box-shadow: 0 0 8px #00e5ff;
-  animation: digitCursorMove 5s linear infinite;
+  animation: digitCursorMove 5s steps(10, end) infinite;
   pointer-events: none;
 }
 
@@ -60,4 +60,4 @@ main{padding:0 10px}
   80%  { left: 85%; }
   90%  { left: 95%; }
   100% { left: 5%; }
-  }
+}
