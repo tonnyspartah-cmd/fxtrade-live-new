@@ -19,7 +19,12 @@ const state = {
   waitingForProposal: null,
   proposalReqId: 0,
   buyReqId: 0,
-  contractReqId: 0
+  contractReqId: 0,
+  tradeCount: 0,
+  winCount: 0,
+  lossCount: 0,
+  profitTotal: 0,
+  autoMode: true
 };
 
 const DERIV_CLIENT_ID = '34m6kBZ1JQGXBHSscpXXQ';
@@ -44,7 +49,12 @@ const ui = {
   stake: $('stake'),
   connect: $('connectDeriv'),
   accountType: $('accountType'),
-  accountLabel: $('accountLabel')
+  accountLabel: $('accountLabel'),
+  tradeCount: $('tradeCount'),
+  winCount: $('winCount'),
+  lossCount: $('lossCount'),
+  profitTotal: $('profitTotal'),
+  aiReason: $('aiReason')
 };
 
 const marketSelect = $('market');
@@ -128,6 +138,7 @@ function analyze() {
 
   ui.confidence.textContent = conf + '%';
   updateDigits();
+  updateAISignalCard();
 }
 
 function mostEven() {
@@ -141,7 +152,7 @@ function mostEven() {
 
 function updateDigits() {
   const total = state.digits.reduce((a, b) => a + b, 0);
-  if (!total) return;
+  if (!total || !ui.grid) return;
 
   const probs = state.digits.map(n => n / total * 100);
   const hi = probs.indexOf(Math.max(...probs));
@@ -152,10 +163,30 @@ function updateDigits() {
     </div>`
   ).join('');
 
-  ui.strongest.textContent = hi;
-  ui.strongestPct.textContent = '(' + probs[hi].toFixed(1) + '%)';
+  ui.strongest && (ui.strongest.textContent = hi);
+  ui.strongestPct && (ui.strongestPct.textContent = '(' + probs[hi].toFixed(1) + '%)');
   ui.digit.textContent = hi;
 }
+
+function updateLiveStats() {
+  if (ui.tradeCount) ui.tradeCount.textContent = state.tradeCount;
+  if (ui.winCount) ui.winCount.textContent = state.winCount;
+  if (ui.lossCount) ui.lossCount.textContent = state.lossCount;
+  if (ui.profitTotal) {
+    const p = Number(state.profitTotal) || 0;
+    ui.profitTotal.textContent = (p >= 0 ? '+$' : '-$') + Math.abs(p).toFixed(2);
+  }
+}
+
+function updateAISignalCard() {
+  if (ui.aiReason) {
+    const dir = ui.direction?.textContent || 'WAIT';
+    ui.aiReason.textContent = dir === 'WAIT'
+      ? 'Waiting for a stronger live signal.'
+      : 'Based on live tick data and recent digit distribution.';
+  }
+}
+
 
 function onTick(t) {
   const q = Number(t.quote);
@@ -774,7 +805,13 @@ function handleContractUpdate(d) {
   if (!isClosed) return;
 
   const profit = Number(c.profit || 0);
-  const won = Number(c.status) === 1 || profit > 0;
+  const won = profit > 0 || String(c.status).toLowerCase() === 'won' || Number(c.status) === 1;
+
+  state.tradeCount++;
+  state.profitTotal += Number.isFinite(profit) ? profit : 0;
+  if (won) state.winCount++;
+  else state.lossCount++;
+  updateLiveStats();
 
   if (won) {
     toast(
@@ -860,6 +897,10 @@ document.querySelectorAll('[data-stake]').forEach(b =>
 
 // Existing center button follows the AI direction.
 $('place').onclick = () => {
+  if (!state.autoMode) {
+    toast('MANUAL mode: choose OVER/UNDER, EVEN/ODD, or RISE/FALL.');
+    return;
+  }
   const signal = ui.direction.textContent;
 
   if (signal === 'OVER' || signal === 'RISE' || signal === 'EVEN') {
@@ -894,6 +935,33 @@ $('analyze').onclick = () => {
   analyze();
   toast('Analysis refreshed.');
 };
+
+// AUTO / MANUAL mode controls. AUTO means the AI TRADE button can follow the current signal;
+// MANUAL keeps the directional buttons available without auto-triggering a trade.
+$('autoMode')?.addEventListener('click', () => {
+  state.autoMode = true;
+  $('autoMode')?.classList.add('active');
+  $('manualMode')?.classList.remove('active');
+  toast('AUTO mode selected.');
+});
+$('manualMode')?.addEventListener('click', () => {
+  state.autoMode = false;
+  $('manualMode')?.classList.add('active');
+  $('autoMode')?.classList.remove('active');
+  toast('MANUAL mode selected.');
+});
+
+document.querySelectorAll('.nav-item').forEach((b, i) => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    if (i === 1) toast('AI panel selected.');
+    if (i === 2) toast('Positions are shown from completed Deriv contracts.');
+  });
+});
+
+updateLiveStats();
+
 
 if (ui.connect) {
   ui.connect.onclick = () => {

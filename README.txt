@@ -1,31 +1,21 @@
-FXTRADE.live — Deriv OAuth connection
+FXTRADE.live redesign package
 
-This version keeps the existing FXTRADE.live design and AI signal and adds a Deriv OAuth connection layer.
+This package redesigns the frontend around the supplied mobile reference:
+- compact purple mobile trading layout
+- volatility selector and live price area
+- digit 0-9 strip
+- AUTO / MANUAL switch
+- stake/presets/target/stop/multiplier area
+- LIVE / T / W / L / running profit bar
+- AI signal card
+- Over/Under, Even/Odd and Rise/Fall support through the existing app.js logic
+- bottom Trade / AI / Positions navigation
 
-Included:
-- Deriv OAuth 2.0 + PKCE login
-- Server-side OAuth token exchange at /api/oauth/token
-- Demo Options account lookup
-- Authenticated Deriv demo WebSocket session via OTP
-- Live Deriv demo balance shown after connection
-- Authenticated tick stream used alongside the existing public market feed
+The existing Deriv OAuth and trading code in app.js was retained and the completed
+contract handler now accumulates trade count, wins, losses and actual contract profit.
 
-Deriv app settings used:
-- App name: fxtrade_live
-- Scope: trade
-- Redirect URL: https://fxtrade-live-new.vercel.app/
-- Markup: 3%
+Important: the running profit is not an artificial counter. It changes when a completed
+Deriv contract reports its profit. Trading can lose money; the AI signal is informational.
 
-Important:
-- The Deriv App ID is included in app.js because it is a client identifier, not a secret.
-- No password, PIN, or personal access token is stored in this project.
-- The existing Place Demo Trade button is still the site's local demo settlement. Real Deriv contract purchase is intentionally the next integration step after confirming OAuth/account connection works.
-
-
-REAL/DEMO TRADING INTEGRATION
-- Demo is the default.
-- The account selector can switch between DEMO and REAL when Deriv provides both.
-- OVER/UNDER buttons request a Deriv proposal and immediately buy the returned contract.
-- The center Place button follows the current AI direction.
-- Real trading uses the selected real Options account and real balance.
-- This does not guarantee profitable outcomes; signals are informational.
+Deploy the contents of this folder as the website root. Keep your existing Vercel
+/api/oauth/token server route if your OAuth exchange depends on it.

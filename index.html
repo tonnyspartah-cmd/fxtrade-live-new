@@ -3,105 +3,127 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>FXTRADE.live — Demo Trading</title>
-<meta name="description" content="FXTRADE.live simple live market demo dashboard">
+<title>FXTRADE.live — Trading Dashboard</title>
+<meta name="description" content="FXTRADE.live trading dashboard">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<div class="page">
-  <header class="header">
-    <div>
-      <div class="brand"><span>FX</span>TRADE<span class="live">.live</span></div>
-      <div class="tagline">Trade Smarter. Practice Today.</div>
-    </div>
+<div class="app-shell">
+  <header class="topbar">
+    <div class="brand"><span>FX</span>TRADE<span class="live">.live</span></div>
     <button class="menu" aria-label="Menu">☰</button>
   </header>
 
+  <div class="marketbar">
+    <button class="icon-btn">☰</button>
+    <button class="mini-tab active">P</button>
+    <button class="mini-tab">R</button>
+    <div class="balance-mini"><span id="accountLabel">Demo Account</span><strong id="balance">$10,000.00</strong></div>
+    <button id="connectDeriv" class="connect">Connect Deriv</button>
+    <select id="accountType" class="account-type" aria-label="Account type">
+      <option value="demo">DEMO</option>
+      <option value="real">REAL</option>
+    </select>
+  </div>
+
+  <nav class="contract-nav" aria-label="Contract types">
+    <button class="contract active" data-contract="OVERUNDER">◉ Matches/Differs</button>
+    <button class="contract" data-contract="EVENODD">▦ Even/Odd</button>
+    <button class="contract" data-contract="OVERUNDER">⇅ Over/Under</button>
+    <button class="contract" data-contract="RISEFALL">↕ Rise/Fall</button>
+  </nav>
+
   <main>
-    <section class="demo-card">
-      <div class="wallet">▣</div>
-      <div class="demo-copy"><div><span id="accountLabel">Demo Account</span> <span class="info">i</span></div><strong id="balance">$10,000.00</strong></div>
-      <div class="account-actions"><select id="accountType" class="account-type" aria-label="Deriv account type"><option value="demo">DEMO</option><option value="real">REAL</option></select><button id="connectDeriv" class="reset connect-deriv">Connect Deriv</button><button id="reset" class="reset">↻ <span>Reset</span></button></div>
-    </section>
-
-    <section class="selectors">
-      <div class="field market-field">
-        <label>Market</label>
+    <section class="market-card">
+      <div class="market-head">
         <select id="market" aria-label="Volatility market">
-          <option value="1HZ100V">Volatility 100 (1s) Index</option>
-          <option value="1HZ90V">Volatility 90 (1s) Index</option>
-          <option value="1HZ75V">Volatility 75 (1s) Index</option>
-          <option value="1HZ50V">Volatility 50 (1s) Index</option>
-          <option value="1HZ30V">Volatility 30 (1s) Index</option>
-          <option value="1HZ25V">Volatility 25 (1s) Index</option>
-          <option value="1HZ15V">Volatility 15 (1s) Index</option>
-          <option value="1HZ10V">Volatility 10 (1s) Index</option>
-          <option value="R_100">Volatility 100 Index</option>
-          <option value="R_75">Volatility 75 Index</option>
-          <option value="R_50">Volatility 50 Index</option>
-          <option value="R_25">Volatility 25 Index</option>
-          <option value="R_10">Volatility 10 Index</option>
+          <option value="1HZ100V">Vol 100 (1s)</option>
+          <option value="1HZ90V">Vol 90 (1s)</option>
+          <option value="1HZ75V">Vol 75 (1s)</option>
+          <option value="1HZ50V">Vol 50 (1s)</option>
+          <option value="1HZ30V">Vol 30 (1s)</option>
+          <option value="1HZ25V">Vol 25 (1s)</option>
+          <option value="1HZ15V">Vol 15 (1s)</option>
+          <option value="1HZ10V">Vol 10 (1s)</option>
         </select>
+        <span class="market-price" id="price">—</span>
+        <span class="market-change" id="change">Live</span>
       </div>
-      <div class="field contract-field">
-        <label>Contract Type</label>
-        <div class="contract-tabs">
-          <button class="contract active" data-contract="OVERUNDER">Over / Under</button>
-          <button class="contract" data-contract="RISEFALL">Rise / Fall</button>
-          <button class="contract" data-contract="EVENODD">Even / Odd</button>
-        </div>
+
+      <div class="chart-area">
+        <div class="chart-line"></div>
+        <div class="chart-labels"><span>21:54:00</span><span>21:54:05</span><span>21:54:10</span><span>21:54:15</span></div>
+        <div class="zoom">+<br>−</div>
+      </div>
+
+      <div class="digit-strip" id="digitGrid"></div>
+    </section>
+
+    <section class="mode-toggle">
+      <button id="autoMode" class="mode active">AUTO</button>
+      <button id="manualMode" class="mode">MANUAL</button>
+    </section>
+
+    <section class="stake-card">
+      <div class="stake-header">
+        <button data-delta="-1">−</button>
+        <div><label>STAKE</label><strong id="stake">5</strong></div>
+        <button data-delta="1">+</button>
+      </div>
+      <div class="presets">
+        <button data-stake="1">$1</button><button data-stake="5">$5</button><button data-stake="10">$10</button>
+        <button data-stake="25">$25</button><button data-stake="50">$50</button><button data-stake="100">$100</button>
+      </div>
+      <div class="risk-row">
+        <div><b>TARGET PROFIT</b><strong>$<span id="targetProfit">3</span></strong></div>
+        <div><b>STOP LOSS</b><strong>$<span id="stopLoss">999</span></strong></div>
+        <div><b>MULTIPLIER</b><strong>× <span id="multiplier">2</span></strong></div>
       </div>
     </section>
 
-    <section class="summary-grid">
-      <div class="panel price-panel">
-        <span>Current Price</span>
-        <strong id="price">—</strong>
-        <b id="change">Live</b>
-      </div>
-      <div class="panel prediction-panel">
-        <span>Prediction Digit</span>
-        <strong id="digitBig">—</strong>
-        <small>Next tick (1s)</small>
-      </div>
-      <div class="panel ai-panel">
-        <span>🤖 FXTRADE AI SIGNAL</span>
-        <strong id="direction">WAIT</strong>
-        <b>Confidence: <em id="confidence">—</em></b>
-        <small>Based on live market data</small>
-      </div>
+    <section class="live-stats">
+      <span class="live-dot">● LIVE</span>
+      <span><b id="tradeCount">0</b> T</span>
+      <span><b id="winCount">0</b> W</span>
+      <span><b id="lossCount">0</b> L</span>
+      <strong id="profitTotal">+$0.00</strong>
     </section>
 
-    <section class="panel digits-panel">
-      <div class="panel-title">
-        <div><b>▮▮▮</b><h2>Last Digit Analysis</h2></div>
-        <div class="strongest">Strongest Digit <strong id="strongestDigit">—</strong> <em id="strongestPct">—</em></div>
+    <section class="signal-card">
+      <div class="signal-top">
+        <span>FXTRADE AI SIGNAL</span>
+        <span id="confidence">—%</span>
       </div>
-      <div class="digit-grid" id="digitGrid"></div>
+      <strong id="direction">WAIT</strong>
+      <small id="aiReason">Waiting for live market data.</small>
     </section>
 
-    <section class="trade-panel">
-      <div class="trade-side over-side">
+    <section class="trade-actions">
+      <div class="action-wrap">
         <button id="over" class="trade over">↑ <span id="leftTradeLabel">OVER</span></button>
         <small id="leftRule">Digits 4 - 9</small>
       </div>
-      <div class="stake-box">
-        <label>Stake (USD)</label>
-        <div class="stake-control"><button data-delta="-1">−</button><strong id="stake">5</strong><button data-delta="1">+</button></div>
-        <div class="presets"><button data-stake="5">$5</button><button data-stake="10">$10</button><button data-stake="20">$20</button><button data-stake="50">$50</button></div>
-        <div class="payout">Potential payout <strong id="payout">$9.80</strong></div>
-        <button id="place" class="place">Place Demo Trade</button>
+      <div class="even-center">
+        <button id="place" class="place">AI TRADE</button>
+        <small>Potential payout <b id="payout">$9.80</b></small>
       </div>
-      <div class="trade-side under-side">
+      <div class="action-wrap">
         <button id="under" class="trade under">↓ <span id="rightTradeLabel">UNDER</span></button>
         <small id="rightRule">Digits 0 - 3</small>
       </div>
     </section>
 
-    <div class="status-row"><span id="connection">● Connecting…</span><button id="analyze">Analyze</button></div>
+    <div class="status-row">
+      <span id="connection">● Connecting…</span>
+      <button id="reset">↻ Reset</button>
+    </div>
   </main>
 
-  <footer><b><span>FX</span>TRADE.live</b><span>Practice. Learn. Improve.</span></footer>
+  <footer class="bottom-nav">
+    <button class="nav-item active"><span>▥</span>Trade</button>
+    <button class="nav-item"><span>✦</span>AI</button>
+    <button class="nav-item"><span>◷</span>Positions <i>0</i></button>
+  </footer>
 </div>
 <div id="toast" class="toast"></div>
 <script src="app.js"></script>
