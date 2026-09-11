@@ -158,10 +158,12 @@ function updateDigits() {
   const hi = probs.indexOf(Math.max(...probs));
 
   ui.grid.innerHTML = probs.map((v, i) =>
-    `<div class="digit ${i === hi ? 'high' : ''}">
-      <b>${i}</b><small>${v.toFixed(1)}%</small>
-    </div>`
-  ).join('');
+  `<div class="digit ${i === hi ? 'high' : ''}">
+    <p>${i}</p>
+    <small>${v.toFixed(1)}%</small>
+    ${i === hi ? '<span class="digit-cursor"></span>' : ''}
+  </div>`
+).join('');
 
   ui.strongest && (ui.strongest.textContent = hi);
   ui.strongestPct && (ui.strongestPct.textContent = '(' + probs[hi].toFixed(1) + '%)');
