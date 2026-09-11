@@ -52,3 +52,18 @@ function moveDigitCursor(){
 renderDigits();
 
 setInterval(moveDigitCursor, 1000);
+.digit {
+  position: relative;
+}
+
+.digit-cursor {
+  position: absolute;
+  bottom: 5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 28px;
+  height: 3px;
+  background: #00f5ff;
+  border-radius: 3px;
+  box-shadow: 0 0 8px #00f5ff;
+                        }
