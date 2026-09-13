@@ -210,7 +210,7 @@ function contractRequest(side){
 }
 function placeTrade(side, fromAuto=false){
   readRisk();riskUpdate();if(state.tradingLocked)return;
-  if(!state.signalReady||!signalMatchesSide(side)){toast('AI filter says WAIT — no trade placed.');return}
+  if(fromAuto && (!state.signalReady||!signalMatchesSide(side))){toast('AI filter says WAIT — no trade placed.');return}
   if(!auth.token||!state.ws||!state.authenticated){toast('Connect Deriv before trading.');return}
   if(state.waitingForProposal){toast('Please wait for the previous trade request.');return}
   const account=selectedAccount();if(!account){toast('Selected Deriv account is unavailable.');return}
@@ -298,8 +298,21 @@ function stopAutoTrade(){
   riskUpdate();
   toast('Trading stopped.');
 }
-$('over').onclick=()=>startAutoTrade('left');
-$('under').onclick=()=>startAutoTrade('right');
+function clickTradeButton(side){
+  state.autoRunning=false;
+  state.autoSide=null;
+  clearTimeout(state.autoTimer);
+  state.autoTimer=null;
+  state.userStopped=false;
+  state.tradingLocked=false;
+  riskUpdate();
+  if(!auth.token||!state.ws||!state.authenticated){toast('Connect Deriv before trading.');return}
+  if(state.contract==='EVENODD' || state.contract==='MATCHDIFF' || state.contract==='OVERUNDER' || state.contract==='RISEFALL'){
+    placeTrade(side,false);
+  }
+}
+$('over').onclick=()=>clickTradeButton('left');
+$('under').onclick=()=>clickTradeButton('right');
 $('stopTrade').onclick=()=>{
   if(state.autoRunning || !state.userStopped) stopAutoTrade();
   else { state.userStopped=false; state.tradingLocked=false; riskUpdate(); toast('Ready to trade.'); }
