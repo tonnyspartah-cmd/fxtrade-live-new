@@ -30,10 +30,12 @@ const ui={
 };
 
 const fallback=[
- ['1HZ100V','Vol 100 (1s)'],['1HZ90V','Vol 90 (1s)'],['1HZ75V','Vol 75 (1s)'],
- ['1HZ50V','Vol 50 (1s)'],['1HZ30V','Vol 30 (1s)'],['1HZ25V','Vol 25 (1s)'],
- ['1HZ15V','Vol 15 (1s)'],['1HZ10V','Vol 10 (1s)'],['R_100','Volatility 100'],
- ['R_75','Volatility 75'],['R_50','Volatility 50']
+ ['1HZ5V','Vol 5 (1s)'],['1HZ10V','Vol 10 (1s)'],['1HZ15V','Vol 15 (1s)'],
+ ['1HZ25V','Vol 25 (1s)'],['1HZ30V','Vol 30 (1s)'],['1HZ50V','Vol 50 (1s)'],
+ ['1HZ75V','Vol 75 (1s)'],['1HZ90V','Vol 90 (1s)'],['1HZ100V','Vol 100 (1s)'],
+ ['1HZ150V','Vol 150 (1s)'],['1HZ250V','Vol 250 (1s)'],
+ ['R_10','Volatility 10'],['R_25','Volatility 25'],['R_50','Volatility 50'],
+ ['R_75','Volatility 75'],['R_100','Volatility 100']
 ];
 
 function toast(t){const e=$('toast');if(!e)return;e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2200)}
@@ -119,7 +121,11 @@ function connectPublic(){
 }
 function populateMarkets(items){
   const merged=new Map(fallback.map(x=>[x[0],x[1]]));
-  (items||[]).forEach(x=>{const n=x.display_name||x.underlying_symbol_name||'';if(x.symbol&&/Volatility/i.test(n))merged.set(x.symbol,n)});
+  (items||[]).forEach(x=>{
+    const n=x.display_name||x.underlying_symbol_name||'';
+    const sym=x.symbol||x.underlying_symbol;
+    if(sym&&/Volatility/i.test(n))merged.set(sym,n);
+  });
   const sel=$('market');const cur=state.symbol;sel.innerHTML=[...merged].map(([v,n])=>`<option value="${v}">${n}</option>`).join('');sel.value=merged.has(cur)?cur:state.symbol;
 }
 
