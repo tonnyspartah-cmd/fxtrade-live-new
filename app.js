@@ -9,7 +9,7 @@ const state = {
   contract:'MATCHDIFF', accountType:'demo', balance:10000,
   currency:'USD', authenticated:false, accountId:null,
   waitingForProposal:null, proposalReqId:0, buyReqId:0, contractReqId:0,
-  wins:0, losses:0, manual:false, multiplier:2
+  wins:0, losses:0, manual:false, multiplier:2, userStopped:false
 };
 
 const DERIV_CLIENT_ID='34m6kBZ1JQGXBHSscpXXQ';
@@ -41,11 +41,19 @@ function fmt(n){return Number(n).toLocaleString(undefined,{minimumFractionDigits
 function lastDigit(n){const s=String(n);const m=s.replace(/\D/g,'');return m?Number(m.at(-1)):null}
 function setConnection(text,ok=false){ui.connection.innerHTML='<i></i>'+text;ui.connection.style.color=ok?'#2ce795':'#ffc857'}
 function readRisk(){state.stopLoss=Math.max(0,Number($('stopLoss').value)||0);state.targetProfit=Math.max(0,Number($('targetProfit').value)||0);state.multiplier=Math.max(1,Number($('multiplier').value)||1)}
+function updateStopButton(){
+  const b=$('stopTrade');
+  if(!b)return;
+  b.textContent=state.userStopped?'▶ START':'■ STOP';
+  b.classList.toggle('stopped',state.userStopped);
+}
 function riskUpdate(){
   readRisk();
   if(state.stopLoss>0&&state.sessionNet<=-state.stopLoss)state.tradingLocked=true;
   if(state.targetProfit>0&&state.sessionNet>=state.targetProfit)state.tradingLocked=true;
-  ui.riskStatus.textContent=state.tradingLocked?'Trading paused':'Risk limits active';
+  if(state.userStopped)state.tradingLocked=true;
+  ui.riskStatus.textContent=state.userStopped?'Trading stopped manually':(state.tradingLocked?'Trading paused':'Risk limits active');
+  updateStopButton();
   ui.sessionNet.textContent=(state.sessionNet>=0?'+$':'-$')+Math.abs(state.sessionNet).toFixed(2);
 }
 function mostEven(){let e=0,o=0;for(let i=0;i<10;i++){if(i%2)o+=state.digits[i];else e+=state.digits[i]}return e>=o}
@@ -194,8 +202,9 @@ document.querySelectorAll('.contract').forEach(b=>b.onclick=()=>{document.queryS
 document.querySelectorAll('[data-delta]').forEach(b=>b.onclick=()=>setStake(state.stake+Number(b.dataset.delta)));
 document.querySelectorAll('[data-stake]').forEach(b=>b.onclick=()=>setStake(Number(b.dataset.stake)));
 $('over').onclick=()=>placeTrade('left');$('under').onclick=()=>placeTrade('right');
+$('stopTrade').onclick=()=>{state.userStopped=!state.userStopped;if(!state.userStopped){state.tradingLocked=false}riskUpdate();toast(state.userStopped?'Trading stopped.':'Trading resumed.')};
 $('place').onclick=()=>{const s=ui.direction.textContent;if(['MATCH','OVER','RISE','EVEN'].includes(s))placeTrade('left');else if(['DIFFER','UNDER','FALL','ODD'].includes(s))placeTrade('right');else toast('AI says WAIT — no trade placed.')};
-$('reset').onclick=()=>{if(state.accountType==='real'){toast('Real balance cannot be reset.');return}state.sessionNet=0;state.wins=0;state.losses=0;state.tradingLocked=false;ui.wins.textContent='0 W';ui.losses.textContent='0 L';riskUpdate();toast('Session reset.')};
+$('reset').onclick=()=>{if(state.accountType==='real'){toast('Real balance cannot be reset.');return}state.sessionNet=0;state.userStopped=false;state.wins=0;state.losses=0;state.tradingLocked=false;ui.wins.textContent='0 W';ui.losses.textContent='0 L';riskUpdate();toast('Session reset.')};
 $('autoMode').onclick=()=>{state.manual=false;$('autoMode').classList.add('selected');$('manualMode').classList.remove('selected')};
 $('manualMode').onclick=()=>{state.manual=true;$('manualMode').classList.add('selected');$('autoMode').classList.remove('selected')};
 $('connectDeriv').onclick=()=>auth.token?loadAccounts():startOAuth();
