@@ -9,7 +9,7 @@ const state = {
   contract:'MATCHDIFF', accountType:'demo', balance:10000,
   currency:'USD', authenticated:false, accountId:null,
   waitingForProposal:null, proposalReqId:0, buyReqId:0, contractReqId:0,
-  wins:0, losses:0, manual:false, multiplier:2, userStopped:false
+  wins:0, losses:0, manual:false, multiplier:2, userStopped:false, autoRunning:false, autoSide:null, autoTimer:null
 };
 
 const DERIV_CLIENT_ID='34m6kBZ1JQGXBHSscpXXQ';
@@ -170,7 +170,7 @@ function contractRequest(side){
   if(state.contract==='OVERUNDER')return{contract_type:side==='left'?'DIGITOVER':'DIGITUNDER',barrier:side==='left'?'3':'4'}
   return{contract_type:side==='left'?'CALL':'PUT'}
 }
-function placeTrade(side){
+function placeTrade(side, fromAuto=false){
   readRisk();riskUpdate();if(state.tradingLocked)return;
   if(!auth.token||!state.ws||!state.authenticated){toast('Connect Deriv before trading.');return}
   if(state.waitingForProposal){toast('Please wait for the previous trade request.');return}
@@ -188,6 +188,10 @@ function handleContractUpdate(d){
   const profit=Number(c.profit||0);state.sessionNet+=Number.isFinite(profit)?profit:0;
   if(profit>0)state.wins++;else state.losses++;ui.wins.textContent=state.wins+' W';ui.losses.textContent=state.losses+' L';state.waitingForProposal=null;riskUpdate();
   toast(profit>0?'WIN +$'+profit.toFixed(2):'LOSS -$'+Math.abs(profit).toFixed(2));
+  if(state.autoRunning && !state.tradingLocked && state.autoSide){
+    clearTimeout(state.autoTimer);
+    state.autoTimer=setTimeout(()=>placeTrade(state.autoSide,true),900);
+  }
 }
 
 function setStake(v){state.stake=Math.max(1,Math.min(100,Number(v)||1));ui.stake.textContent=state.stake;ui.payout.textContent='$'+(state.stake*1.96).toFixed(2)}
@@ -201,9 +205,30 @@ function updateLabels(){
 document.querySelectorAll('.contract').forEach(b=>b.onclick=()=>{document.querySelectorAll('.contract').forEach(x=>x.classList.remove('active'));b.classList.add('active');state.contract=b.dataset.contract;updateLabels();analyze()});
 document.querySelectorAll('[data-delta]').forEach(b=>b.onclick=()=>setStake(state.stake+Number(b.dataset.delta)));
 document.querySelectorAll('[data-stake]').forEach(b=>b.onclick=()=>setStake(Number(b.dataset.stake)));
-$('over').onclick=()=>placeTrade('left');$('under').onclick=()=>placeTrade('right');
-$('stopTrade').onclick=()=>{state.userStopped=!state.userStopped;if(!state.userStopped){state.tradingLocked=false}riskUpdate();toast(state.userStopped?'Trading stopped.':'Trading resumed.')};
-$('place').onclick=()=>{const s=ui.direction.textContent;if(['MATCH','OVER','RISE','EVEN'].includes(s))placeTrade('left');else if(['DIFFER','UNDER','FALL','ODD'].includes(s))placeTrade('right');else toast('AI says WAIT — no trade placed.')};
+function startAutoTrade(side){
+  if(state.autoRunning)return;
+  readRisk(); state.userStopped=false; state.tradingLocked=false;
+  state.autoRunning=true; state.autoSide=side;
+  riskUpdate();
+  document.querySelectorAll('.trade').forEach(b=>b.classList.remove('selected'));
+  $(side==='left'?'over':'under').classList.add('selected');
+  toast('Auto trading started.');
+  placeTrade(side,true);
+}
+function stopAutoTrade(){
+  state.autoRunning=false; state.autoSide=null;
+  clearTimeout(state.autoTimer); state.autoTimer=null;
+  state.userStopped=true; state.tradingLocked=true;
+  riskUpdate();
+  toast('Trading stopped.');
+}
+$('over').onclick=()=>startAutoTrade('left');
+$('under').onclick=()=>startAutoTrade('right');
+$('stopTrade').onclick=()=>{
+  if(state.autoRunning || !state.userStopped) stopAutoTrade();
+  else { state.userStopped=false; state.tradingLocked=false; riskUpdate(); toast('Ready to trade.'); }
+};
+$('place').onclick=()=>{const s=ui.direction.textContent;if(['MATCH','OVER','RISE','EVEN'].includes(s))startAutoTrade('left');else if(['DIFFER','UNDER','FALL','ODD'].includes(s))startAutoTrade('right');else toast('AI says WAIT — no trade placed.')};
 $('reset').onclick=()=>{if(state.accountType==='real'){toast('Real balance cannot be reset.');return}state.sessionNet=0;state.userStopped=false;state.wins=0;state.losses=0;state.tradingLocked=false;ui.wins.textContent='0 W';ui.losses.textContent='0 L';riskUpdate();toast('Session reset.')};
 $('autoMode').onclick=()=>{state.manual=false;$('autoMode').classList.add('selected');$('manualMode').classList.remove('selected')};
 $('manualMode').onclick=()=>{state.manual=true;$('manualMode').classList.add('selected');$('autoMode').classList.remove('selected')};
