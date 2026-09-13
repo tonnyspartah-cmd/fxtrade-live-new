@@ -10,7 +10,7 @@ const state = {
   currency:'USD', authenticated:false, accountId:null,
   waitingForProposal:null, proposalReqId:0, buyReqId:0, contractReqId:0,
   wins:0, losses:0, manual:false, multiplier:2, userStopped:false, autoRunning:false, autoSide:null, autoTimer:null,
-  signalReady:false, signalScore:0, consecutiveLosses:0, aiCooldownUntil:0
+  signalReady:false, signalScore:0, consecutiveLosses:0, aiCooldownUntil:0, aiTrades:0, aiWins:0, aiLosses:0
 };
 
 const DERIV_CLIENT_ID='34m6kBZ1JQGXBHSscpXXQ';
@@ -125,7 +125,9 @@ function analyze(){
   ui.direction.textContent=dir;
   ui.confidence.textContent=(state.signalReady?baseConf:Math.min(69,Math.max(50,score)))+'%';
   text=dir==='WAIT'?'No strong direction yet.':`Live ${state.contract==='MATCHDIFF'?'digit':'market'} signal: ${dir}.`;
-  ui.signalText.textContent=state.signalReady?text+' Filter: STRONG.':text+' Filter: WAIT — filters are not aligned.';
+  const actualRate=state.aiTrades?Math.round(state.aiWins/state.aiTrades*100):0;
+  const perf=state.aiTrades?' AI actual win rate: '+actualRate+'% ('+state.aiWins+'W/'+state.aiLosses+'L).':' AI performance: no completed AI trades yet.';
+  ui.signalText.textContent=(state.signalReady?text+' Filter: STRONG.':text+' Filter: WAIT — filters are not aligned.')+perf;
   drawChart();
 }
 
@@ -223,7 +225,13 @@ function handleContractUpdate(d){
   const c=d.proposal_open_contract;if(!c||!state.waitingForProposal)return;
   const closed=c.is_sold===1||c.status==='sold'||c.status==='expired';if(!closed)return;
   const profit=Number(c.profit||0);state.sessionNet+=Number.isFinite(profit)?profit:0;
-  if(profit>0)state.wins++;else state.losses++;ui.wins.textContent=state.wins+' W';ui.losses.textContent=state.losses+' L';state.waitingForProposal=null;riskUpdate();
+  if(profit>0){state.wins++;state.aiWins++;}else{state.losses++;state.aiLosses++;}
+  state.aiTrades=state.aiWins+state.aiLosses;
+  ui.wins.textContent=state.wins+' W';ui.losses.textContent=state.losses+' L';
+  state.waitingForProposal=null;riskUpdate();
+  const actualRate=state.aiTrades?Math.round(state.aiWins/state.aiTrades*100):0;
+  ui.signalText.textContent='AI session: '+state.aiTrades+' trades • '+state.aiWins+' W / '+state.aiLosses+' L • actual win rate '+actualRate+'%.';
+
   toast(profit>0?'WIN +$'+profit.toFixed(2):'LOSS -$'+Math.abs(profit).toFixed(2));
   if(profit>0){
     state.consecutiveLosses=0;
@@ -297,7 +305,7 @@ $('stopTrade').onclick=()=>{
   else { state.userStopped=false; state.tradingLocked=false; riskUpdate(); toast('Ready to trade.'); }
 };
 $('place').onclick=()=>{const s=ui.direction.textContent;if(['MATCH','OVER','RISE','EVEN'].includes(s))startAutoTrade('left');else if(['DIFFER','UNDER','FALL','ODD'].includes(s))startAutoTrade('right');else toast('AI says WAIT — no trade placed.')};
-$('reset').onclick=()=>{if(state.accountType==='real'){toast('Real balance cannot be reset.');return}state.sessionNet=0;state.userStopped=false;state.wins=0;state.losses=0;state.tradingLocked=false;ui.wins.textContent='0 W';ui.losses.textContent='0 L';riskUpdate();toast('Session reset.')};
+$('reset').onclick=()=>{if(state.accountType==='real'){toast('Real balance cannot be reset.');return}state.sessionNet=0;state.userStopped=false;state.wins=0;state.losses=0;state.aiTrades=0;state.aiWins=0;state.aiLosses=0;state.consecutiveLosses=0;state.tradingLocked=false;ui.wins.textContent='0 W';ui.losses.textContent='0 L';riskUpdate();toast('Session reset.')};
 $('autoMode').onclick=()=>{state.manual=false;$('autoMode').classList.add('selected');$('manualMode').classList.remove('selected')};
 $('manualMode').onclick=()=>{state.manual=true;$('manualMode').classList.add('selected');$('autoMode').classList.remove('selected')};
 $('connectDeriv').onclick=()=>auth.token?loadAccounts():startOAuth();
