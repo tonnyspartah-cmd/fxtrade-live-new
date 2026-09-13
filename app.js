@@ -9,8 +9,7 @@ const state = {
   contract:'MATCHDIFF', accountType:'demo', balance:10000,
   currency:'USD', authenticated:false, accountId:null,
   waitingForProposal:null, proposalReqId:0, buyReqId:0, contractReqId:0,
-  wins:0, losses:0, manual:false, multiplier:2, userStopped:false, autoRunning:false, autoSide:null, autoTimer:null,
-  signalReady:false, signalScore:0, consecutiveLosses:0, aiCooldownUntil:0
+  wins:0, losses:0, manual:false, multiplier:2, userStopped:false, autoRunning:false, autoSide:null, autoTimer:null
 };
 
 const DERIV_CLIENT_ID='34m6kBZ1JQGXBHSscpXXQ';
@@ -82,7 +81,7 @@ function updateDigits(){
 }
 
 function analyze(){
-  if(state.prices.length<12)return;
+  if(state.prices.length<8)return;
   const p=state.prices.slice(-30),a=p[0],b=p.at(-1),delta=b-a,half=Math.floor(p.length/2);
   const av1=p.slice(0,half).reduce((s,v)=>s+v,0)/half;
   const av2=p.slice(half).reduce((s,v)=>s+v,0)/(p.length-half);
@@ -93,39 +92,10 @@ function analyze(){
   else if(state.contract==='RISEFALL')dir=bull?'RISE':bear?'FALL':'WAIT';
   else if(state.contract==='EVENODD')dir=mostEven()?'EVEN':'ODD';
   else {const target=info.hi;dir=info.current===target?'MATCH':'DIFFER'}
-
-  const total=state.digits.reduce((x,y)=>x+y,0)||1;
-  const evenPct=state.digits.reduce((x,y,i)=>x+(i%2===0?y:0),0)/total*100;
-  const oddPct=100-evenPct;
-  const recent=p.slice(-8).map(lastDigit).filter(Number.isInteger);
-
-  let score=50;
-  if(bull||bear)score+=12;
-  if(Math.abs(delta/Math.max(Math.abs(a),1))*100000>0.8)score+=8;
-
-  if(state.contract==='EVENODD'){
-    const edge=Math.abs(evenPct-50);
-    if(edge>=5)score+=10; else score-=8;
-    if(recent.length>=6){
-      const parity=recent.filter(d=>d%2===0).length;
-      if(parity===0||parity===recent.length)score-=6;
-    }
-  }else if(state.contract==='MATCHDIFF'){
-    const hiPct=(state.digits[info.hi]/total)*100;
-    if(hiPct>=14)score+=8; else score-=5;
-  }else{
-    score+=Math.min(8,Math.abs(delta/Math.max(Math.abs(a),1))*100000);
-  }
-
-  score=Math.max(0,Math.min(100,Math.round(score)));
-  state.signalScore=score;
-  state.signalReady=score>=70 && dir!=='WAIT';
-
-  const baseConf=Math.min(95,Math.max(55,Math.round(55+Math.min(40,Math.abs(delta/Math.max(Math.abs(a),1))*100000*6))));
-  ui.direction.textContent=dir;
-  ui.confidence.textContent=(state.signalReady?baseConf:Math.min(69,Math.max(50,score)))+'%';
-  text=dir==='WAIT'?'No strong direction yet.':`Live ${state.contract==='MATCHDIFF'?'digit':'market'} signal: ${dir}.`;
-  ui.signalText.textContent=state.signalReady?text+' Filter: STRONG.':text+' Filter: WAIT — filters are not aligned.';
+  const conf=Math.min(95,Math.max(55,Math.round(55+Math.min(40,Math.abs(delta/Math.max(a,1))*100000*6))));
+  ui.direction.textContent=dir;ui.confidence.textContent=conf+'%';
+  text=dir==='WAIT'?'No strong direction yet.':`Live ${state.contract==='MATCHDIFF'?'digit': 'market'} signal: ${dir}.`;
+  ui.signalText.textContent=text;
   drawChart();
 }
 
@@ -208,7 +178,6 @@ function contractRequest(side){
 }
 function placeTrade(side, fromAuto=false){
   readRisk();riskUpdate();if(state.tradingLocked)return;
-  if(fromAuto && (!state.signalReady||!signalMatchesSide(side))){toast('AI filter says WAIT — no trade placed.');return}
   if(!auth.token||!state.ws||!state.authenticated){toast('Connect Deriv before trading.');return}
   if(state.waitingForProposal){toast('Please wait for the previous trade request.');return}
   const account=selectedAccount();if(!account){toast('Selected Deriv account is unavailable.');return}
@@ -223,25 +192,11 @@ function handleContractUpdate(d){
   const c=d.proposal_open_contract;if(!c||!state.waitingForProposal)return;
   const closed=c.is_sold===1||c.status==='sold'||c.status==='expired';if(!closed)return;
   const profit=Number(c.profit||0);state.sessionNet+=Number.isFinite(profit)?profit:0;
-  if(profit>0)state.wins++;else state.losses++;
-  ui.wins.textContent=state.wins+' W';ui.losses.textContent=state.losses+' L';
-  state.waitingForProposal=null;riskUpdate();
-
+  if(profit>0)state.wins++;else state.losses++;ui.wins.textContent=state.wins+' W';ui.losses.textContent=state.losses+' L';state.waitingForProposal=null;riskUpdate();
   toast(profit>0?'WIN +$'+profit.toFixed(2):'LOSS -$'+Math.abs(profit).toFixed(2));
-  if(profit>0){
-    state.consecutiveLosses=0;
-    state.aiCooldownUntil=Date.now()+900;
-  }else{
-    state.consecutiveLosses++;
-    state.aiCooldownUntil=Date.now()+3500;
-    if(state.consecutiveLosses>=3){
-      state.autoRunning=false;state.autoSide=null;
-      toast('AI stopped after 3 consecutive losses.');
-    }
-  }
   if(state.autoRunning && !state.tradingLocked && state.autoSide){
     clearTimeout(state.autoTimer);
-    state.autoTimer=setTimeout(tryAutoEntry,1200);
+    state.autoTimer=setTimeout(()=>placeTrade(state.autoSide,true),900);
   }
 }
 
@@ -256,35 +211,15 @@ function updateLabels(){
 document.querySelectorAll('.contract').forEach(b=>b.onclick=()=>{document.querySelectorAll('.contract').forEach(x=>x.classList.remove('active'));b.classList.add('active');state.contract=b.dataset.contract;updateLabels();analyze()});
 document.querySelectorAll('[data-delta]').forEach(b=>b.onclick=()=>setStake(state.stake+Number(b.dataset.delta)));
 document.querySelectorAll('[data-stake]').forEach(b=>b.onclick=()=>setStake(Number(b.dataset.stake)));
-function signalMatchesSide(side){
-  const d=ui.direction.textContent;
-  return side==='left'?['MATCH','OVER','RISE','EVEN'].includes(d):['DIFFER','UNDER','FALL','ODD'].includes(d);
-}
-function aiCanTrade(side){
-  if(Date.now()<state.aiCooldownUntil||state.consecutiveLosses>=3)return false;
-  analyze();
-  return state.signalReady&&signalMatchesSide(side);
-}
-function tryAutoEntry(){
-  if(!state.autoRunning||state.tradingLocked||state.waitingForProposal)return;
-  if(!aiCanTrade(state.autoSide)){
-    ui.signalText.textContent='AI: WAIT — waiting for a fresh strong signal.';
-    clearTimeout(state.autoTimer);
-    state.autoTimer=setTimeout(tryAutoEntry,1200);
-    return;
-  }
-  placeTrade(state.autoSide,true);
-}
 function startAutoTrade(side){
   if(state.autoRunning)return;
-  readRisk();state.userStopped=false;state.tradingLocked=false;
-  if(!aiCanTrade(side)){toast('AI says WAIT — no trade started.');return}
-  state.autoRunning=true;state.autoSide=side;
+  readRisk(); state.userStopped=false; state.tradingLocked=false;
+  state.autoRunning=true; state.autoSide=side;
   riskUpdate();
   document.querySelectorAll('.trade').forEach(b=>b.classList.remove('selected'));
   $(side==='left'?'over':'under').classList.add('selected');
-  toast('AI auto-trader started.');
-  tryAutoEntry();
+  toast('Auto trading started.');
+  placeTrade(side,true);
 }
 function stopAutoTrade(){
   state.autoRunning=false; state.autoSide=null;
@@ -293,27 +228,14 @@ function stopAutoTrade(){
   riskUpdate();
   toast('Trading stopped.');
 }
-function clickTradeButton(side){
-  state.autoRunning=false;
-  state.autoSide=null;
-  clearTimeout(state.autoTimer);
-  state.autoTimer=null;
-  state.userStopped=false;
-  state.tradingLocked=false;
-  riskUpdate();
-  if(!auth.token||!state.ws||!state.authenticated){toast('Connect Deriv before trading.');return}
-  if(state.contract==='EVENODD' || state.contract==='MATCHDIFF' || state.contract==='OVERUNDER' || state.contract==='RISEFALL'){
-    placeTrade(side,false);
-  }
-}
-$('over').onclick=()=>clickTradeButton('left');
-$('under').onclick=()=>clickTradeButton('right');
+$('over').onclick=()=>startAutoTrade('left');
+$('under').onclick=()=>startAutoTrade('right');
 $('stopTrade').onclick=()=>{
   if(state.autoRunning || !state.userStopped) stopAutoTrade();
   else { state.userStopped=false; state.tradingLocked=false; riskUpdate(); toast('Ready to trade.'); }
 };
 $('place').onclick=()=>{const s=ui.direction.textContent;if(['MATCH','OVER','RISE','EVEN'].includes(s))startAutoTrade('left');else if(['DIFFER','UNDER','FALL','ODD'].includes(s))startAutoTrade('right');else toast('AI says WAIT — no trade placed.')};
-$('reset').onclick=()=>{if(state.accountType==='real'){toast('Real balance cannot be reset.');return}state.sessionNet=0;state.userStopped=false;state.wins=0;state.losses=0;state.aiTrades=0;state.aiWins=0;state.aiLosses=0;state.consecutiveLosses=0;state.tradingLocked=false;ui.wins.textContent='0 W';ui.losses.textContent='0 L';riskUpdate();toast('Session reset.')};
+$('reset').onclick=()=>{if(state.accountType==='real'){toast('Real balance cannot be reset.');return}state.sessionNet=0;state.userStopped=false;state.wins=0;state.losses=0;state.tradingLocked=false;ui.wins.textContent='0 W';ui.losses.textContent='0 L';riskUpdate();toast('Session reset.')};
 $('autoMode').onclick=()=>{state.manual=false;$('autoMode').classList.add('selected');$('manualMode').classList.remove('selected')};
 $('manualMode').onclick=()=>{state.manual=true;$('manualMode').classList.add('selected');$('autoMode').classList.remove('selected')};
 $('connectDeriv').onclick=()=>auth.token?loadAccounts():startOAuth();
