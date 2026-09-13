@@ -211,6 +211,11 @@ function contractRequest(side){
 }
 function placeTrade(side, fromAuto=false){
   readRisk();riskUpdate();if(state.tradingLocked)return;
+  analyze();
+  if(!state.signalReady || !signalMatchesSide(side)){
+    toast('Signal filter says WAIT — no trade placed.');
+    return;
+  }
   if(!state.signalReady){
     if(fromAuto){clearTimeout(state.autoTimer);state.autoTimer=setTimeout(()=>placeTrade(side,true),1200);return;}
     toast('Signal filter says WAIT — no trade placed.');return;
@@ -233,7 +238,7 @@ function handleContractUpdate(d){
   toast(profit>0?'WIN +$'+profit.toFixed(2):'LOSS -$'+Math.abs(profit).toFixed(2));
   if(state.autoRunning && !state.tradingLocked && state.autoSide){
     clearTimeout(state.autoTimer);
-    state.autoTimer=setTimeout(()=>placeTrade(state.autoSide,true),900);
+    state.autoTimer=setTimeout(tryAutoEntry,900);
   }
 }
 
@@ -248,15 +253,37 @@ function updateLabels(){
 document.querySelectorAll('.contract').forEach(b=>b.onclick=()=>{document.querySelectorAll('.contract').forEach(x=>x.classList.remove('active'));b.classList.add('active');state.contract=b.dataset.contract;updateLabels();analyze()});
 document.querySelectorAll('[data-delta]').forEach(b=>b.onclick=()=>setStake(state.stake+Number(b.dataset.delta)));
 document.querySelectorAll('[data-stake]').forEach(b=>b.onclick=()=>setStake(Number(b.dataset.stake)));
+function signalMatchesSide(side){
+  const s=ui.direction.textContent;
+  return side==='left'
+    ? ['MATCH','OVER','RISE','EVEN'].includes(s)
+    : ['DIFFER','UNDER','FALL','ODD'].includes(s);
+}
+function tryAutoEntry(){
+  if(!state.autoRunning || state.tradingLocked || state.waitingForProposal)return;
+  analyze();
+  if(!state.signalReady || !signalMatchesSide(state.autoSide)){
+    ui.signalText.textContent='Filter: WAIT — waiting for a fresh strong signal.';
+    clearTimeout(state.autoTimer);
+    state.autoTimer=setTimeout(tryAutoEntry,1200);
+    return;
+  }
+  placeTrade(state.autoSide,true);
+}
 function startAutoTrade(side){
   if(state.autoRunning)return;
   readRisk(); state.userStopped=false; state.tradingLocked=false;
+  analyze();
+  if(!state.signalReady || !signalMatchesSide(side)){
+    toast('Signal filter says WAIT — no trade started.');
+    return;
+  }
   state.autoRunning=true; state.autoSide=side;
   riskUpdate();
   document.querySelectorAll('.trade').forEach(b=>b.classList.remove('selected'));
   $(side==='left'?'over':'under').classList.add('selected');
   toast('Auto trading started.');
-  placeTrade(side,true);
+  tryAutoEntry();
 }
 function stopAutoTrade(){
   state.autoRunning=false; state.autoSide=null;
