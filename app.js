@@ -268,7 +268,7 @@ function setStake(v){state.stake=Math.max(1,Math.min(100,Number(v)||1));ui.stake
 function updateLabels(){
   if(state.contract==='MATCHDIFF'){ui.leftLabel.textContent='MATCH';ui.rightLabel.textContent='DIFFER';ui.leftRule.textContent='Current digit';ui.rightRule.textContent='Other digits'}
   else if(state.contract==='EVENODD'){ui.leftLabel.textContent='EVEN';ui.rightLabel.textContent='ODD';ui.leftRule.textContent='0, 2, 4, 6, 8';ui.rightRule.textContent='1, 3, 5, 7, 9'}
-  else if(state.contract==='OVERUNDER'){ui.leftLabel.textContent='OVER';ui.rightLabel.textContent='UNDER';ui.leftRule.textContent='Digits 4 - 9';ui.rightRule.textContent='Digits 0 - 3'}
+  else if(state.contract==='OVERUNDER'){ui.leftLabel.textContent='OVER';ui.rightLabel.textContent='UNDER';ui.leftRule.textContent='Digits 4 - 9';ui.rightRule.textContent='Digits 0 - 2'}
   else{ui.leftLabel.textContent='RISE';ui.rightLabel.textContent='FALL';ui.leftRule.textContent='Price goes up';ui.rightRule.textContent='Price goes down'}
 }
 
