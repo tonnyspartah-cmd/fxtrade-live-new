@@ -281,7 +281,7 @@ function startAutoTrade(side){
   state.autoRunning=true; state.autoSide=side;
   riskUpdate();
   document.querySelectorAll('.trade').forEach(b=>b.classList.remove('selected'));
-  $(side==='left'?'over':'under').classList.add('selected');
+  document.querySelectorAll('.trade').forEach(b=>b.classList.remove('active'));if(side==='left')$('over').classList.add('active');if(side==='right')$('under').classList.add('active');
   toast('Auto trading started.');
   placeTrade(side,true);
 }
