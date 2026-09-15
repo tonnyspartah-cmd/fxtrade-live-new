@@ -117,7 +117,15 @@ function updateDigits(){
   const probs=state.digits.map(n=>n/total*100),hi=probs.indexOf(Math.max(...probs));
   const current=state.prices.length?lastDigit(state.prices.at(-1)):null;
   ui.digitGrid.innerHTML=probs.map((v,i)=>`<div class="digit ${i===hi?'high':''}"><b>${i}</b><small>${v.toFixed(1)}%</small></div>`).join('');
-  if(Number.isInteger(current)){const cursor=document.createElement('div');cursor.className='digit-cursor';cursor.style.left=((current+.5)*10)+'%';ui.digitGrid.appendChild(cursor)}
+  if(Number.isInteger(current)){
+    const currentCell=ui.digitGrid.querySelectorAll('.digit')[current];
+    if(currentCell){
+      const cursor=document.createElement('div');
+      cursor.className='digit-cursor';
+      cursor.style.left=(currentCell.offsetLeft+currentCell.offsetWidth/2)+'px';
+      ui.digitGrid.appendChild(cursor);
+    }
+  }
   return {probs,hi,current};
 }
 
