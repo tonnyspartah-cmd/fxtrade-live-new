@@ -164,7 +164,7 @@ function onTick(t){
 }
 
 function subscribePublic(ws){
-  ws.send(JSON.stringify({active_symbols:'brief',product_type:'basic',req_id:1}));
+  ws.send(JSON.stringify({active_symbols:'brief',req_id:1}));
   ws.send(JSON.stringify({ticks:state.symbol,subscribe:1,req_id:2}));
   ws.send(JSON.stringify({ticks_history:state.symbol,count:80,end:'latest',style:'ticks',req_id:3}));
 }
