@@ -4,12 +4,12 @@ const $ = id => document.getElementById(id);
 
 const state = {
   ws:null, publicSocket:null, reconnect:null, symbol:'1HZ100V',
-  prices:[], digits:Array(10).fill(0), stake:1, stopLoss:999,
+  prices:[], tickDigits:[], digits:Array(10).fill(0), pipSize:null, stake:1, stopLoss:999,
   targetProfit:3, sessionNet:0, tradingLocked:false,
   contract:'MATCHDIFF', accountType:'demo', balance:10000,
   currency:'USD', authenticated:false, accountId:null,
   waitingForProposal:null, proposalReqId:0, buyReqId:0, contractReqId:0,
-  wins:0, losses:0, manual:false, multiplier:2, userStopped:false, autoRunning:false, autoSide:null, autoTimer:null
+  wins:0, losses:0, manual:false, multiplier:2, userStopped:false, autoRunning:false, autoSide:null, autoTimer:null, signalQuality:0, signalReady:false
 };
 
 const DERIV_CLIENT_ID='34m6kBZ1JQGXBHSscpXXQ';
@@ -40,7 +40,17 @@ const fallback=[
 
 function toast(t){const e=$('toast');if(!e)return;e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2200)}
 function fmt(n){return Number(n).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}
-function lastDigit(n){const s=String(n);const m=s.replace(/\D/g,'');return m?Number(m.at(-1)):null}
+function lastDigit(n,pipSize=state.pipSize){
+  const q=Number(n); if(!Number.isFinite(q)) return null;
+  const p=Number.isInteger(pipSize)?pipSize:null;
+  if(p!==null){
+    const fixed=q.toFixed(p);
+    const m=fixed.replace(/\D/g,'');
+    return m?Number(m.at(-1)):null;
+  }
+  const m=String(n).replace(/\D/g,'');
+  return m?Number(m.at(-1)):null;
+}
 function setConnection(text,ok=false){ui.connection.innerHTML='<i></i>'+text;ui.connection.style.color=ok?'#2ce795':'#ffc857'}
 function readRisk(){state.stopLoss=Math.max(0,Number($('stopLoss').value)||0);state.targetProfit=Math.max(0,Number($('targetProfit').value)||0);state.multiplier=Math.max(1,Number($('multiplier').value)||1)}
 function updateStopButton(){
@@ -60,6 +70,37 @@ function riskUpdate(){
 }
 function mostEven(){let e=0,o=0;for(let i=0;i<10;i++){if(i%2)o+=state.digits[i];else e+=state.digits[i]}return e>=o}
 function strongestDigit(){let best=0;for(let i=1;i<10;i++)if(state.digits[i]>state.digits[best])best=i;return best}
+
+function signalFilter(info){
+  const p=state.prices.slice(-30);
+  if(p.length<12)return{ready:false,score:0,reason:'Collecting more market data…'};
+  const total=state.digits.reduce((a,b)=>a+b,0)||1;
+  const even=state.digits.reduce((a,b,i)=>a+(i%2===0?b:0),0)/total*100;
+  const odd=100-even;
+  let score=50;
+  const delta=Number(p.at(-1))-Number(p[0]);
+  const h=Math.floor(p.length/2);
+  const av1=p.slice(0,h).reduce((a,b)=>a+b,0)/h;
+  const av2=p.slice(h).reduce((a,b)=>a+b,0)/(p.length-h);
+  if((delta>0&&av2>=av1)||(delta<0&&av2<=av1))score+=12;
+  if(state.contract==='EVENODD'){
+    const edge=mostEven()?even:odd;
+    score+=edge>=54?10:-10;
+  }else if(state.contract==='MATCHDIFF'){
+    const hi=info?.hi??strongestDigit();
+    const edge=state.digits[hi]/total*100;
+    score+=edge>=14?8:-5;
+  }else{
+    score+=Math.min(10,Math.abs(delta/Math.max(Math.abs(p[0]),1))*100000*1.5);
+  }
+  const recent=p.slice(-8).map(lastDigit).filter(Number.isInteger);
+  if(state.contract==='EVENODD'&&recent.length>=6){
+    const same=recent.filter(d=>d%2===recent.at(-1)%2).length/recent.length;
+    if(same>=0.75)score-=8;
+  }
+  score=Math.max(0,Math.min(100,Math.round(score)));
+  return{ready:score>=70,score,reason:score>=70?'Multiple filters agree.':'Filters do not agree strongly enough.'};
+}
 
 function drawChart(){
   const c=ui.chart,ctx=c.getContext('2d'),r=c.getBoundingClientRect(),d=devicePixelRatio||1;
@@ -92,17 +133,25 @@ function analyze(){
   else if(state.contract==='RISEFALL')dir=bull?'RISE':bear?'FALL':'WAIT';
   else if(state.contract==='EVENODD')dir=mostEven()?'EVEN':'ODD';
   else {const target=info.hi;dir=info.current===target?'MATCH':'DIFFER'}
-  const conf=Math.min(95,Math.max(55,Math.round(55+Math.min(40,Math.abs(delta/Math.max(a,1))*100000*6))));
+  const baseConf=55+Math.min(40,Math.abs(delta/Math.max(a,1))*100000*6);
+  const filtered=signalFilter(info);state.signalQuality=filtered.score;state.signalReady=filtered.ready;
+  const conf=filtered.ready?Math.max(55,Math.min(95,Math.round(baseConf))):Math.min(69,Math.max(50,Math.round(50+filtered.score/5)));
   ui.direction.textContent=dir;ui.confidence.textContent=conf+'%';
   text=dir==='WAIT'?'No strong direction yet.':`Live ${state.contract==='MATCHDIFF'?'digit': 'market'} signal: ${dir}.`;
-  ui.signalText.textContent=text;
+  ui.signalText.textContent=filtered.ready?text+' Filter: STRONG.':text+' Filter: WAIT — '+filtered.reason;
   drawChart();
 }
 
 function onTick(t){
   const q=Number(t.quote);if(!Number.isFinite(q))return;
   state.prices.push(q);if(state.prices.length>120)state.prices.shift();
-  const d=lastDigit(q);if(d!==null)state.digits[d]++;
+  const d=lastDigit(q,state.pipSize);
+  if(d!==null){
+    state.tickDigits.push(d);
+    if(state.tickDigits.length>state.digitWindowSize)state.tickDigits.shift();
+    state.digits=Array(10).fill(0);
+    state.tickDigits.forEach(x=>state.digits[x]++);
+  }
   ui.price.textContent=fmt(q);analyze();
 }
 
@@ -115,7 +164,10 @@ function connectPublic(){
   try{state.publicSocket?.close()}catch{}
   setConnection('CONNECTING…');const ws=new WebSocket(PUBLIC_WS);state.publicSocket=ws;let opened=false;
   ws.onopen=()=>{opened=true;setConnection('LIVE',true);subscribePublic(ws)};
-  ws.onmessage=e=>{try{const d=JSON.parse(e.data);if(d.msg_type==='tick'&&d.tick)onTick(d.tick);if(d.msg_type==='history'&&d.history?.prices){state.prices=d.history.prices.map(Number).filter(Number.isFinite).slice(-120);state.digits=Array(10).fill(0);state.prices.forEach(v=>{const z=lastDigit(v);if(z!==null)state.digits[z]++});analyze()}if(d.msg_type==='active_symbols'&&Array.isArray(d.active_symbols))populateMarkets(d.active_symbols)}catch{}};
+  ws.onmessage=e=>{try{const d=JSON.parse(e.data);if(d.msg_type==='tick'&&d.tick)onTick(d.tick);if(d.msg_type==='history'&&d.history?.prices){state.pipSize=Number.isInteger(d.history.pip_size)?Number(d.history.pip_size):state.pipSize;
+      state.prices=d.history.prices.map(Number).filter(Number.isFinite).slice(-120);
+      state.tickDigits=state.prices.slice(-100).map(v=>lastDigit(v,state.pipSize)).filter(Number.isInteger);
+      state.digits=Array(10).fill(0);state.tickDigits.forEach(z=>state.digits[z]++);analyze()}if(d.msg_type==='active_symbols'&&Array.isArray(d.active_symbols))populateMarkets(d.active_symbols)}catch{}};
   ws.onerror=()=>{if(!opened)setConnection('CONNECTION ERROR')};
   ws.onclose=()=>{setConnection('RECONNECTING…');clearTimeout(state.reconnect);state.reconnect=setTimeout(connectPublic,3000)};
 }
@@ -178,6 +230,10 @@ function contractRequest(side){
 }
 function placeTrade(side, fromAuto=false){
   readRisk();riskUpdate();if(state.tradingLocked)return;
+  if(!state.signalReady){
+    if(fromAuto){clearTimeout(state.autoTimer);state.autoTimer=setTimeout(()=>placeTrade(side,true),1200);return;}
+    toast('Signal filter says WAIT — no trade placed.');return;
+  }
   if(!auth.token||!state.ws||!state.authenticated){toast('Connect Deriv before trading.');return}
   if(state.waitingForProposal){toast('Please wait for the previous trade request.');return}
   const account=selectedAccount();if(!account){toast('Selected Deriv account is unavailable.');return}
