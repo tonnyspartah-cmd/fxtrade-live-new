@@ -233,7 +233,7 @@ async function connectSelectedAccount(){
 function contractRequest(side){
   if(state.contract==='MATCHDIFF'){const barrier=String(lastDigit(state.prices.at(-1))??strongestDigit());return{contract_type:side==='left'?'DIGITMATCH':'DIGITDIFF',barrier}}
   if(state.contract==='EVENODD')return{contract_type:side==='left'?'DIGITEVEN':'DIGITODD'}
-  if(state.contract==='OVERUNDER')return{contract_type:side==='left'?'DIGITOVER':'DIGITUNDER',barrier:side==='left'?'3':'4'}
+  if(state.contract==='OVERUNDER')return{contract_type:side==='left'?'DIGITOVER':'DIGITUNDER',barrier:side==='left'?'3':'3'}
   return{contract_type:side==='left'?'CALL':'PUT'}
 }
 function placeTrade(side, fromAuto=false){
