@@ -22,7 +22,7 @@ const ui={
   price:$('price'), digitGrid:$('digitGrid'), balance:$('balance'),
   direction:$('direction'), confidence:$('confidence'), connection:$('connection'),
   payout:$('payout'), stake:$('stake'), connect:$('connectDeriv'),
-  accountType:$('accountType'), accountLabel:$('accountLabel'),
+  accountType:$('accountType'), accountLabel:$('accountLabel'), headerConnectionText:$('headerConnectionText'), headerConnectionDot:$('headerConnectionDot'),
   leftLabel:$('leftTradeLabel'), rightLabel:$('rightTradeLabel'),
   leftRule:$('leftRule'), rightRule:$('rightRule'),
   wins:$('wins'), losses:$('losses'), sessionNet:$('sessionNet'),
@@ -51,7 +51,7 @@ function lastDigit(n,pipSize=state.pipSize){
   const m=String(n).replace(/\D/g,'');
   return m?Number(m.at(-1)):null;
 }
-function setConnection(text,ok=false){ui.connection.innerHTML='<i></i>'+text;ui.connection.style.color=ok?'#2ce795':'#ffc857'}
+function setConnection(text,ok=false){ui.connection.innerHTML='<i></i>'+text;ui.connection.style.color=ok?'#2ce795':'#ffc857';if(ui.headerConnectionText){ui.headerConnectionText.textContent=ok?'Deriv Connected':(text==='LIVE'?'Market Live':'Not Connected')}if(ui.headerConnectionDot){ui.headerConnectionDot.style.background=ok?'#18f08b':(text==='LIVE'?'#18f08b':'#ffc857')}}
 function readRisk(){state.stopLoss=Math.max(0,Number($('stopLoss').value)||0);state.targetProfit=Math.max(0,Number($('targetProfit').value)||0);state.multiplier=Math.max(1,Number($('multiplier').value)||1)}
 function updateStopButton(){
   const b=$('stopTrade');
@@ -198,7 +198,7 @@ async function finishOAuth(){
   if(returned!==sessionStorage.getItem('oauth_state')){toast('Deriv login verification failed.');return}
   try{
     const r=await fetch('/api/oauth/token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,code_verifier:sessionStorage.getItem('pkce_code_verifier'),redirect_uri:REDIRECT_URI,client_id:DERIV_CLIENT_ID})});
-    const d=await r.json();if(!r.ok||!d.access_token)throw new Error(d.error||'Token exchange failed');
+    const d=await r.json();if(!r.ok||!d.access_token)throw new Error(d.error_description||d.error||'Token exchange failed');
     auth.token=d.access_token;sessionStorage.setItem('deriv_access_token',auth.token);sessionStorage.removeItem('pkce_code_verifier');sessionStorage.removeItem('oauth_state');history.replaceState({},'',location.pathname);await loadAccounts();
   }catch(e){console.error(e);toast('Deriv connection failed.')}
 }
@@ -474,5 +474,6 @@ function scannerBacktest(){
   else add();
 })();
 
+if(auth.token){ui.connect.textContent='Connecting…';ui.connect.classList.add('connected')}else{ui.connect.textContent='Connect Deriv';ui.connect.classList.remove('connected')}
 setStake(1);updateLabels();riskUpdate();connectPublic();finishOAuth().then(()=>{if(auth.token)loadAccounts()});
 })();
