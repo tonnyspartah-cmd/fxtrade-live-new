@@ -117,15 +117,7 @@ function updateDigits(){
   const probs=state.digits.map(n=>n/total*100),hi=probs.indexOf(Math.max(...probs));
   const current=state.prices.length?lastDigit(state.prices.at(-1)):null;
   ui.digitGrid.innerHTML=probs.map((v,i)=>`<div class="digit ${i===hi?'high':''}"><b>${i}</b><small>${v.toFixed(1)}%</small></div>`).join('');
-  if(Number.isInteger(current)){
-    const currentCell=ui.digitGrid.querySelectorAll('.digit')[current];
-    if(currentCell){
-      const cursor=document.createElement('div');
-      cursor.className='digit-cursor';
-      cursor.style.left=(currentCell.offsetLeft+currentCell.offsetWidth/2)+'px';
-      ui.digitGrid.appendChild(cursor);
-    }
-  }
+  if(Number.isInteger(current)){const cursor=document.createElement('div');cursor.className='digit-cursor';cursor.style.left=((current+.5)*10)+'%';ui.digitGrid.appendChild(cursor)}
   return {probs,hi,current};
 }
 
@@ -153,18 +145,12 @@ function analyze(){
 function onTick(t){
   const q=Number(t.quote);if(!Number.isFinite(q))return;
   state.prices.push(q);if(state.prices.length>120)state.prices.shift();
-  const d=lastDigit(q,state.pipSize);
-  if(d!==null){
-    state.tickDigits.push(d);
-    if(state.tickDigits.length>state.digitWindowSize)state.tickDigits.shift();
-    state.digits=Array(10).fill(0);
-    state.tickDigits.forEach(x=>state.digits[x]++);
-  }
+  const d=lastDigit(q);if(d!==null)state.digits[d]++;
   ui.price.textContent=fmt(q);analyze();
 }
 
 function subscribePublic(ws){
-  ws.send(JSON.stringify({active_symbols:'brief',req_id:1}));
+  ws.send(JSON.stringify({active_symbols:'brief',product_type:'basic',req_id:1}));
   ws.send(JSON.stringify({ticks:state.symbol,subscribe:1,req_id:2}));
   ws.send(JSON.stringify({ticks_history:state.symbol,count:80,end:'latest',style:'ticks',req_id:3}));
 }
@@ -233,7 +219,7 @@ async function connectSelectedAccount(){
 function contractRequest(side){
   if(state.contract==='MATCHDIFF'){const barrier=String(lastDigit(state.prices.at(-1))??strongestDigit());return{contract_type:side==='left'?'DIGITMATCH':'DIGITDIFF',barrier}}
   if(state.contract==='EVENODD')return{contract_type:side==='left'?'DIGITEVEN':'DIGITODD'}
-  if(state.contract==='OVERUNDER')return{contract_type:side==='left'?'DIGITOVER':'DIGITUNDER',barrier:side==='left'?'3':'3'}
+  if(state.contract==='OVERUNDER')return{contract_type:side==='left'?'DIGITOVER':'DIGITUNDER',barrier:side==='left'?'3':'4'}
   return{contract_type:side==='left'?'CALL':'PUT'}
 }
 function placeTrade(side, fromAuto=false){
@@ -268,7 +254,7 @@ function setStake(v){state.stake=Math.max(1,Math.min(100,Number(v)||1));ui.stake
 function updateLabels(){
   if(state.contract==='MATCHDIFF'){ui.leftLabel.textContent='MATCH';ui.rightLabel.textContent='DIFFER';ui.leftRule.textContent='Current digit';ui.rightRule.textContent='Other digits'}
   else if(state.contract==='EVENODD'){ui.leftLabel.textContent='EVEN';ui.rightLabel.textContent='ODD';ui.leftRule.textContent='0, 2, 4, 6, 8';ui.rightRule.textContent='1, 3, 5, 7, 9'}
-  else if(state.contract==='OVERUNDER'){ui.leftLabel.textContent='OVER';ui.rightLabel.textContent='UNDER';ui.leftRule.textContent='Digits 4 - 9';ui.rightRule.textContent='Digits 0 - 2'}
+  else if(state.contract==='OVERUNDER'){ui.leftLabel.textContent='OVER';ui.rightLabel.textContent='UNDER';ui.leftRule.textContent='Digits 4 - 9';ui.rightRule.textContent='Digits 0 - 3'}
   else{ui.leftLabel.textContent='RISE';ui.rightLabel.textContent='FALL';ui.leftRule.textContent='Price goes up';ui.rightRule.textContent='Price goes down'}
 }
 
@@ -281,7 +267,7 @@ function startAutoTrade(side){
   state.autoRunning=true; state.autoSide=side;
   riskUpdate();
   document.querySelectorAll('.trade').forEach(b=>b.classList.remove('selected'));
-  document.querySelectorAll('.trade').forEach(b=>b.classList.remove('active'));if(side==='left')$('over').classList.add('active');if(side==='right')$('under').classList.add('active');
+  $(side==='left'?'over':'under').classList.add('selected');
   toast('Auto trading started.');
   placeTrade(side,true);
 }
