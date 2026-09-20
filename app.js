@@ -145,7 +145,13 @@ function analyze(){
 function onTick(t){
   const q=Number(t.quote);if(!Number.isFinite(q))return;
   state.prices.push(q);if(state.prices.length>120)state.prices.shift();
-  const d=lastDigit(q);if(d!==null)state.digits[d]++;
+  const d=lastDigit(q,state.pipSize);
+  if(d!==null){
+    state.tickDigits.push(d);
+    if(state.tickDigits.length>state.digitWindowSize)state.tickDigits.shift();
+    state.digits=Array(10).fill(0);
+    state.tickDigits.forEach(x=>state.digits[x]++);
+  }
   ui.price.textContent=fmt(q);analyze();
 }
 
@@ -293,6 +299,173 @@ $('accountType').onchange=async e=>{state.accountType=e.target.value;sessionStor
 $('market').onchange=e=>{state.symbol=e.target.value;state.prices=[];state.digits=Array(10).fill(0);connectPublic()};
 $('stopLoss').oninput=riskUpdate;$('targetProfit').oninput=riskUpdate;$('multiplier').onchange=readRisk;
 window.addEventListener('resize',drawChart);
+
+
+/* ================= FXTRADE AI SCANNER BACKTEST =================
+   Uses Deriv's public historical tick data. It evaluates the scanner
+   one tick at a time: signal uses only ticks already known at that
+   moment, and the following tick is the outcome.
+*/
+function scannerBacktestOutcome(signal, nextDigit, targetDigit){
+  if(signal==='OVER') return nextDigit>=4;
+  if(signal==='UNDER') return nextDigit<=3;
+  if(signal==='EVEN') return nextDigit%2===0;
+  if(signal==='ODD') return nextDigit%2===1;
+  if(signal==='MATCH') return nextDigit===targetDigit;
+  if(signal==='DIFFER') return nextDigit!==targetDigit;
+  return null;
+}
+
+function scannerBacktestSignal(prices, digits){
+  if(prices.length<30)return null;
+
+  const p=prices.slice(-30);
+  const a=p[0], b=p.at(-1), delta=b-a, half=Math.floor(p.length/2);
+  const av1=p.slice(0,half).reduce((s,v)=>s+v,0)/half;
+  const av2=p.slice(half).reduce((s,v)=>s+v,0)/(p.length-half);
+  const bull=delta>0&&av2>=av1, bear=delta<0&&av2<=av1;
+
+  let dir='WAIT';
+  if(state.contract==='OVERUNDER') dir=bull?'OVER':bear?'UNDER':'WAIT';
+  else if(state.contract==='RISEFALL') dir=bull?'RISE':bear?'FALL':'WAIT';
+  else if(state.contract==='EVENODD'){
+    let e=0,o=0;
+    digits.forEach((n,i)=>i%2?o+=n:e+=n);
+    dir=e>=o?'EVEN':'ODD';
+  } else {
+    const total=digits.reduce((a,b)=>a+b,0)||1;
+    let hi=0;
+    for(let i=1;i<10;i++) if(digits[i]>digits[hi]) hi=i;
+    const current=lastDigit(b,state.pipSize);
+    dir=current===hi?'MATCH':'DIFFER';
+    return {dir,target:hi};
+  }
+  return {dir,target:null};
+}
+
+function scannerBacktest(){
+  if(!state.publicSocket || state.publicSocket.readyState!==1){
+    toast('Connect to Deriv market data first.');
+    return;
+  }
+
+  const oldText=ui.signalText?.textContent||'';
+  if(ui.signalText) ui.signalText.textContent='Backtest: downloading 1,200 ticks…';
+
+  const reqId=Date.now();
+  const handler=(event)=>{
+    let d;
+    try{d=JSON.parse(event.data)}catch{return}
+    if(d.req_id!==reqId || d.msg_type!=='history')return;
+
+    state.publicSocket.removeEventListener('message',handler);
+
+    const prices=(d.history?.prices||[]).map(Number).filter(Number.isFinite);
+    if(prices.length<200){
+      if(ui.signalText)ui.signalText.textContent=oldText;
+      toast('Not enough historical ticks returned.');
+      return;
+    }
+
+    const digitsAll=prices.map(v=>lastDigit(v,state.pipSize));
+    const rows=[];
+    let wins=0,losses=0,waits=0,profit=0,maxLossStreak=0,lossStreak=0;
+
+    // Walk forward. At index i, only prices[0..i] are known.
+    // The next tick i+1 is the simulated 1-tick outcome.
+    for(let i=30;i<prices.length-1;i++){
+      const histDigits=digitsAll.slice(0,i+1).filter(Number.isInteger);
+      const counts=Array(10).fill(0);
+      histDigits.slice(-100).forEach(x=>counts[x]++);
+
+      const signal=scannerBacktestSignal(prices.slice(0,i+1),counts);
+      if(!signal || signal.dir==='WAIT'){
+        waits++;
+        continue;
+      }
+
+      const nextDigit=digitsAll[i+1];
+      if(!Number.isInteger(nextDigit))continue;
+
+      // Rise/Fall is directional rather than digit-based.
+      let win=null;
+      if(signal.dir==='RISE') win=prices[i+1]>prices[i];
+      else if(signal.dir==='FALL') win=prices[i+1]<prices[i];
+      else win=scannerBacktestOutcome(signal.dir,nextDigit,signal.target);
+
+      if(win===null)continue;
+
+      const row={signal:signal.dir,win};
+      rows.push(row);
+
+      if(win){
+        wins++;
+        lossStreak=0;
+        // Conservative demo accounting: 96% profit on a $1 win.
+        profit+=0.96;
+      }else{
+        losses++;
+        lossStreak++;
+        maxLossStreak=Math.max(maxLossStreak,lossStreak);
+        profit-=1;
+      }
+    }
+
+    const total=wins+losses;
+    const rate=total?wins/total*100:0;
+
+    // Breakdown by signal direction.
+    const by={};
+    rows.forEach(r=>{
+      by[r.signal]??={w:0,l:0};
+      r.win?by[r.signal].w++:by[r.signal].l++;
+    });
+
+    const breakdown=Object.entries(by)
+      .map(([k,v])=>{
+        const n=v.w+v.l;
+        return `${k}: ${v.w}/${n} (${n?(v.w/n*100).toFixed(1):'0.0'}%)`;
+      }).join(' • ');
+
+    const msg=
+      `BACKTEST ${total} signals | Win ${wins} | Loss ${losses} | `+
+      `Win rate ${rate.toFixed(1)}% | Max losing streak ${maxLossStreak} | `+
+      `Net demo P/L $${profit.toFixed(2)} | WAIT ${waits}`+
+      (breakdown?` | ${breakdown}`:'');
+
+    if(ui.signalText)ui.signalText.textContent=msg;
+    toast(`Backtest complete: ${rate.toFixed(1)}% win rate`);
+    console.log('[FXTRADE BACKTEST]',{symbol:state.symbol,total,wins,losses,winRate:rate,maxLossStreak,profit,waits,breakdown:by});
+  };
+
+  state.publicSocket.addEventListener('message',handler);
+  state.publicSocket.send(JSON.stringify({
+    ticks_history:state.symbol,
+    count:1200,
+    end:'latest',
+    style:'ticks',
+    subscribe:0,
+    req_id:reqId
+  }));
+}
+
+// Add a Backtest button without requiring an HTML rewrite.
+(function addBacktestButton(){
+  const add=()=>{
+    if($('backtestScanner'))return;
+    const anchor=$('analyze')||$('place');
+    if(!anchor)return;
+    const b=document.createElement('button');
+    b.id='backtestScanner';
+    b.type='button';
+    b.textContent='BACKTEST SCANNER';
+    b.style.cssText='margin-left:8px;padding:7px 10px;border-radius:8px;border:1px solid #777;background:#171717;color:#fff;font-weight:700;font-size:11px;cursor:pointer;';
+    b.onclick=scannerBacktest;
+    anchor.parentNode?.appendChild(b);
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',add);
+  else add();
+})();
 
 setStake(1);updateLabels();riskUpdate();connectPublic();finishOAuth().then(()=>{if(auth.token)loadAccounts()});
 })();
