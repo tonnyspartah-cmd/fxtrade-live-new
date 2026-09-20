@@ -6,7 +6,7 @@ const state = {
   ws:null, publicSocket:null, reconnect:null, symbol:'1HZ100V',
   prices:[], tickDigits:[], digits:Array(10).fill(0), pipSize:null, stake:1, stopLoss:999,
   targetProfit:3, sessionNet:0, tradingLocked:false,
-  contract:'MATCHDIFF', accountType:'demo', balance:10000,
+  contract:'OVERUNDER', accountType:'demo', balance:10000,
   currency:'USD', authenticated:false, accountId:null,
   waitingForProposal:null, proposalReqId:0, buyReqId:0, contractReqId:0,
   wins:0, losses:0, manual:false, multiplier:2, userStopped:false, autoRunning:false, autoSide:null, autoTimer:null, signalQuality:0, signalReady:false
@@ -26,7 +26,7 @@ const ui={
   leftLabel:$('leftTradeLabel'), rightLabel:$('rightTradeLabel'),
   leftRule:$('leftRule'), rightRule:$('rightRule'),
   wins:$('wins'), losses:$('losses'), sessionNet:$('sessionNet'),
-  signalText:$('signalText'), riskStatus:$('riskStatus'), chart:$('chart')
+  signalText:$('signalText'), riskStatus:$('riskStatus'), chart:$('chart'), strongestDigit:$('strongestDigit'), strongestPct:$('strongestPct'), digitBig:$('digitBig')
 };
 
 const fallback=[
@@ -117,6 +117,9 @@ function updateDigits(){
   const probs=state.digits.map(n=>n/total*100),hi=probs.indexOf(Math.max(...probs));
   const current=state.prices.length?lastDigit(state.prices.at(-1)):null;
   ui.digitGrid.innerHTML=probs.map((v,i)=>`<div class="digit ${i===hi?'high':''}"><b>${i}</b><small>${v.toFixed(1)}%</small></div>`).join('');
+  if(ui.strongestDigit)ui.strongestDigit.textContent=hi;
+  if(ui.strongestPct)ui.strongestPct.textContent='('+probs[hi].toFixed(1)+'%)';
+  if(ui.digitBig)ui.digitBig.textContent=Number.isInteger(current)?current:'—';
   if(Number.isInteger(current)){const cursor=document.createElement('div');cursor.className='digit-cursor';cursor.style.left=((current+.5)*10)+'%';ui.digitGrid.appendChild(cursor)}
   return {probs,hi,current};
 }
@@ -137,6 +140,8 @@ function analyze(){
   const filtered=signalFilter(info);state.signalQuality=filtered.score;state.signalReady=filtered.ready;
   const conf=filtered.ready?Math.max(55,Math.min(95,Math.round(baseConf))):Math.min(69,Math.max(50,Math.round(50+filtered.score/5)));
   ui.direction.textContent=dir;ui.confidence.textContent=conf+'%';
+  const statusEl=$('signalStatus'); if(statusEl){statusEl.textContent=filtered.ready?'STRONG':'WAIT';statusEl.style.color=filtered.ready?'#00ef8a':'#ffd21a';}
+  const clock=$('scanTime'); if(clock)clock.textContent=new Date().toLocaleTimeString();
   text=dir==='WAIT'?'No strong direction yet.':`Live ${state.contract==='MATCHDIFF'?'digit': 'market'} signal: ${dir}.`;
   ui.signalText.textContent=filtered.ready?text+' Filter: STRONG.':text+' Filter: WAIT — '+filtered.reason;
   drawChart();
@@ -298,6 +303,8 @@ $('connectDeriv').onclick=()=>auth.token?loadAccounts():startOAuth();
 $('accountType').onchange=async e=>{state.accountType=e.target.value;sessionStorage.setItem('deriv_account_type',state.accountType);if(auth.token)await connectSelectedAccount();else{$('accountType').value='demo';state.accountType='demo';toast('Connect Deriv first.')}};
 $('market').onchange=e=>{state.symbol=e.target.value;state.prices=[];state.digits=Array(10).fill(0);connectPublic()};
 $('stopLoss').oninput=riskUpdate;$('targetProfit').oninput=riskUpdate;$('multiplier').onchange=readRisk;
+document.querySelectorAll('[data-risk]').forEach(b=>b.onclick=()=>{const id=b.dataset.risk;const el=$(id);if(!el)return;el.value=Math.max(0,Number(el.value||0)+Number(b.dataset.change||0));el.dispatchEvent(new Event('input',{bubbles:true}))});
+let tickCount=1; $('tickMinus').onclick=()=>{tickCount=Math.max(1,tickCount-1);$('ticksValue').textContent=tickCount}; $('tickPlus').onclick=()=>{tickCount=Math.min(10,tickCount+1);$('ticksValue').textContent=tickCount};
 window.addEventListener('resize',drawChart);
 
 
