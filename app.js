@@ -193,39 +193,87 @@ async function startOAuth(){
   const verifier=randomString(),stateVal=randomString(32);sessionStorage.setItem('pkce_code_verifier',verifier);sessionStorage.setItem('oauth_state',stateVal);
   const u=new URL('https://auth.deriv.com/oauth2/auth');u.searchParams.set('response_type','code');u.searchParams.set('client_id',DERIV_CLIENT_ID);u.searchParams.set('redirect_uri',REDIRECT_URI);u.searchParams.set('scope','trade');u.searchParams.set('state',stateVal);u.searchParams.set('code_challenge',await sha256(verifier));u.searchParams.set('code_challenge_method','S256');location.href=u;
 }
+function derivError(stage,e){
+  const msg=String(e?.message||e||'Unknown error').replace(/\s+/g,' ').trim().slice(0,180);
+  console.error('FXTRADE Deriv '+stage, e);
+  setConnection('ERROR — '+stage,false);
+  toast('Deriv '+stage+' failed: '+msg);
+}
 async function finishOAuth(){
-  const q=new URLSearchParams(location.search),code=q.get('code'),returned=q.get('state');if(!code)return;
-  if(returned!==sessionStorage.getItem('oauth_state')){toast('Deriv login verification failed.');return}
+  const q=new URLSearchParams(location.search);
+  const oauthError=q.get('error');
+  const oauthDescription=q.get('error_description');
+  const code=q.get('code');
+  const returned=q.get('state');
+  if(oauthError){
+    derivError('LOGIN',new Error(oauthDescription||oauthError));
+    return false;
+  }
+  if(!code)return false;
+  if(returned!==sessionStorage.getItem('oauth_state')){
+    derivError('STATE',new Error('Returned OAuth state does not match.'));
+    return false;
+  }
+  const verifier=sessionStorage.getItem('pkce_code_verifier');
+  if(!verifier){
+    derivError('PKCE',new Error('The saved PKCE verifier is missing. Please start Connect Deriv again.'));
+    return false;
+  }
   try{
-    const r=await fetch('/api/oauth/token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,code_verifier:sessionStorage.getItem('pkce_code_verifier'),redirect_uri:REDIRECT_URI,client_id:DERIV_CLIENT_ID})});
-    const d=await r.json();if(!r.ok||!d.access_token)throw new Error(d.error_description||d.error||'Token exchange failed');
-    auth.token=d.access_token;sessionStorage.setItem('deriv_access_token',auth.token);sessionStorage.removeItem('pkce_code_verifier');sessionStorage.removeItem('oauth_state');history.replaceState({},'',location.pathname);await loadAccounts();
-  }catch(e){console.error(e);toast('Deriv connection failed.')}
+    setConnection('AUTHORIZING…');
+    const r=await fetch('/api/oauth/token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,code_verifier:verifier,redirect_uri:REDIRECT_URI,client_id:DERIV_CLIENT_ID})});
+    const text=await r.text();
+    let d={};try{d=JSON.parse(text)}catch{d={error:text||'Invalid token response'}}
+    if(!r.ok||!d.access_token)throw new Error(d.error_description||d.error||'Token exchange failed ('+r.status+')');
+    auth.token=d.access_token;
+    sessionStorage.setItem('deriv_access_token',auth.token);
+    sessionStorage.removeItem('pkce_code_verifier');
+    sessionStorage.removeItem('oauth_state');
+    history.replaceState({},'',location.pathname);
+    await loadAccounts();
+    return true;
+  }catch(e){
+    derivError('TOKEN',e);
+    return false;
+  }
 }
 function savedAccounts(){try{return JSON.parse(sessionStorage.getItem('deriv_accounts')||'{}')}catch{return{}}}
 function selectedAccount(){return savedAccounts()[state.accountType]||null}
 async function loadAccounts(){
-  if(!auth.token)return;
+  if(!auth.token){derivError('ACCOUNT',new Error('No OAuth access token is available.'));return false}
   try{
+    setConnection('LOADING ACCOUNT…');
     const r=await fetch(DERIV_API+'/trading/v1/options/accounts',{headers:{Authorization:'Bearer '+auth.token}});
-    const d=await r.json();if(!r.ok)throw new Error(d?.errors?.[0]?.message||'Account lookup failed');
+    const text=await r.text();
+    let d={};try{d=JSON.parse(text)}catch{d={error:text||'Invalid account response'}}
+    if(!r.ok)throw new Error(d?.errors?.[0]?.message||d?.error_description||d?.error||'Account lookup failed ('+r.status+')');
     const raw=Array.isArray(d.data)?d.data:(Array.isArray(d.data?.accounts)?d.data.accounts:[]);
-    const demo=raw.find(a=>String(a.account_type||a.type||'').toLowerCase()==='demo'),real=raw.find(a=>String(a.account_type||a.type||'').toLowerCase()==='real');
+    const demo=raw.find(a=>String(a.account_type||a.type||'').toLowerCase()==='demo');
+    const real=raw.find(a=>String(a.account_type||a.type||'').toLowerCase()==='real');
     sessionStorage.setItem('deriv_accounts',JSON.stringify({demo:demo||null,real:real||null}));
+    if(!demo&&!real)throw new Error('No Options demo/real account was returned by Deriv.');
     await connectSelectedAccount();
-  }catch(e){console.error(e);toast(e.message||'Could not load Deriv accounts.')}
+    return true;
+  }catch(e){derivError('ACCOUNT',e);return false}
 }
 async function connectSelectedAccount(){
-  const a=selectedAccount();if(!auth.token||!a){toast('No '+state.accountType+' Options account available.');return}
+  const a=selectedAccount();
+  if(!auth.token){derivError('SESSION',new Error('No OAuth access token is available.'));return false}
+  if(!a){derivError('SESSION',new Error('No '+state.accountType+' Options account is available.'));return false}
   state.accountId=a.account_id;state.currency=a.currency||'USD';
   try{
+    setConnection('AUTHORIZING ACCOUNT…');
     const r=await fetch(DERIV_API+'/trading/v1/options/accounts/'+encodeURIComponent(state.accountId)+'/otp',{method:'POST',headers:{Authorization:'Bearer '+auth.token}});
-    const d=await r.json();if(!r.ok||!d.data?.url)throw new Error(d?.errors?.[0]?.message||'Could not create Deriv session');
+    const text=await r.text();
+    let d={};try{d=JSON.parse(text)}catch{d={error:text||'Invalid OTP response'}}
+    if(!r.ok||!d.data?.url)throw new Error(d?.errors?.[0]?.message||d?.error_description||d?.error||'Could not create Deriv session ('+r.status+')');
     const ws=new WebSocket(d.data.url);state.ws=ws;
     ws.onopen=()=>{state.authenticated=true;ui.connect.textContent='Deriv Connected';ui.connect.classList.add('connected');ui.accountLabel.textContent=state.accountType==='real'?'Real Account':'Demo Account';setConnection('DERIV '+state.accountType.toUpperCase(),true);ws.send(JSON.stringify({balance:1,subscribe:1,req_id:500}));ws.send(JSON.stringify({ticks:state.symbol,subscribe:1,req_id:501}))};
     ws.onmessage=e=>{try{const d=JSON.parse(e.data);if(d.error){if(d.req_id===state.proposalReqId||d.req_id===state.buyReqId)state.waitingForProposal=null;toast(d.error.message||'Deriv request failed.');return}if(d.msg_type==='balance'&&d.balance){state.balance=Number(d.balance.balance);ui.balance.textContent='$'+state.balance.toFixed(2)}if(d.msg_type==='tick'&&d.tick)onTick(d.tick);if(d.msg_type==='proposal'&&d.req_id===state.proposalReqId)handleProposal(d);if(d.msg_type==='buy'&&d.req_id===state.buyReqId)handleBuy(d);if(d.msg_type==='proposal_open_contract'&&d.req_id===state.contractReqId)handleContractUpdate(d)}catch{}};
-    ws.onerror=()=>setConnection('DERIV ERROR');ws.onclose=()=>{state.authenticated=false;ui.connect.textContent='Connect Deriv';ui.connect.classList.remove('connected');setConnection('DISCONNECTED')};
-  }catch(e){toast(e.message||'Deriv connection failed.')}
+    ws.onerror=()=>{setConnection('DERIV ERROR');toast('Deriv authenticated WebSocket reported an error.')};
+    ws.onclose=e=>{state.authenticated=false;ui.connect.textContent='Connect Deriv';ui.connect.classList.remove('connected');setConnection('DISCONNECTED');if(e.code!==1000)toast('Deriv session closed ('+e.code+'). '+(e.reason||''))};
+    return true;
+  }catch(e){derivError('SESSION',e);return false}
 }
 function contractRequest(side){
   if(state.contract==='MATCHDIFF'){const barrier=String(lastDigit(state.prices.at(-1))??strongestDigit());return{contract_type:side==='left'?'DIGITMATCH':'DIGITDIFF',barrier}}
@@ -475,5 +523,5 @@ function scannerBacktest(){
 })();
 
 if(auth.token){ui.connect.textContent='Connecting…';ui.connect.classList.add('connected')}else{ui.connect.textContent='Connect Deriv';ui.connect.classList.remove('connected')}
-setStake(1);updateLabels();riskUpdate();connectPublic();finishOAuth().then(()=>{if(auth.token)loadAccounts()});
+setStake(1);updateLabels();riskUpdate();connectPublic();finishOAuth();
 })();
