@@ -5,7 +5,7 @@ const $ = id => document.getElementById(id);
 const state = {
   ws:null, symbol:'1HZ100V', prices:[], digits:Array(10).fill(0),
   stake:0.25, contract:'OVERUNDER', balance:10000, sessionNet:0,
-  wins:0, losses:0, pending:null, stopped:false, reconnect:null
+  wins:0, losses:0, pending:null, stopped:false, autoSide:null, autoTimer:null, reconnect:null
 };
 const feeds=['wss://api.derivws.com/trading/v1/options/ws/public','wss://ws.binaryws.com/websockets/v3'];
 
@@ -135,6 +135,7 @@ function startDemo(side){
   if(state.balance<state.stake){toast('Demo balance is too low.');return}
   state.balance-=state.stake;
   state.pending={side,entry:state.prices.at(-1),stake:state.stake,contract:state.contract};
+  if(state.autoSide===null) state.autoSide=side;
   ui.balance.textContent='$'+fmt(state.balance);
   toast('Demo '+(side==='left'?$('leftTradeLabel').textContent:$('rightTradeLabel').textContent)+' placed');
 }
@@ -154,6 +155,10 @@ function settleDemo(price){
   $('sessionNet').textContent=(state.sessionNet>=0?'+$':'-$')+Math.abs(state.sessionNet).toFixed(2);
   $('wins').textContent=state.wins;$('losses').textContent=state.losses;
   checkLimits();
+  if(!state.stopped && state.autoSide && !state.pending){
+    clearTimeout(state.autoTimer);
+    state.autoTimer=setTimeout(()=>startDemo(state.autoSide),250);
+  }
 }
 
 function checkLimits(){
@@ -170,9 +175,14 @@ document.querySelectorAll('.contract').forEach(b=>b.onclick=()=>{
 });
 document.querySelectorAll('[data-delta]').forEach(b=>b.onclick=()=>setStake(state.stake+Number(b.dataset.delta)));
 document.querySelectorAll('[data-stake]').forEach(b=>b.onclick=()=>setStake(Number(b.dataset.stake)));
-$('over').onclick=()=>startDemo('left');$('under').onclick=()=>startDemo('right');
-$('stopTrade').onclick=()=>{state.stopped=!state.stopped;$('stopTrade').textContent=state.stopped?'▶ RESUME':'■ STOP';toast(state.stopped?'Trading stopped':'Trading resumed')};
-$('reset').onclick=()=>{state.balance=10000;state.sessionNet=0;state.wins=0;state.losses=0;state.pending=null;state.stopped=false;ui.balance.textContent='$10,000.00';$('sessionNet').textContent='$0.00';$('wins').textContent='0';$('losses').textContent='0';$('stopTrade').textContent='■ STOP';toast('Demo reset')};
+$('over').onclick=()=>{state.autoSide='left';startDemo('left')};$('under').onclick=()=>{state.autoSide='right';startDemo('right')};
+$('stopTrade').onclick=()=>{
+  state.stopped=!state.stopped;
+  if(state.stopped){state.autoSide=null;clearTimeout(state.autoTimer);state.autoTimer=null}
+  $('stopTrade').textContent=state.stopped?'▶ RESUME':'■ STOP';
+  toast(state.stopped?'Trading stopped':'Trading resumed');
+};
+$('reset').onclick=()=>{clearTimeout(state.autoTimer);state.autoTimer=null;state.autoSide=null;state.balance=10000;state.sessionNet=0;state.wins=0;state.losses=0;state.pending=null;state.stopped=false;ui.balance.textContent='$10,000.00';$('sessionNet').textContent='$0.00';$('wins').textContent='0';$('losses').textContent='0';$('stopTrade').textContent='■ STOP';toast('Demo reset')};
 window.addEventListener('resize',drawChart);
 setStake(.25);updateLabels();connect();
 })();
