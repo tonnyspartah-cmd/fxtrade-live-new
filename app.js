@@ -7,7 +7,7 @@ const state = {
   stake:0.25, contract:'OVERUNDER', balance:10000, sessionNet:0,
   wins:0, losses:0, pending:null, stopped:false, reconnect:null
 };
-const feeds=['wss://ws.derivws.com/websockets/v3?app_id=1089','wss://ws.binaryws.com/websockets/v3?app_id=1089'];
+const feeds=['wss://api.derivws.com/trading/v1/options/ws/public','wss://ws.binaryws.com/websockets/v3'];
 
 const ui={
   price:$('price'), digit:$('digitBig'), confidence:$('confidence'),
@@ -103,8 +103,10 @@ function loadHistory(h){
 }
 
 function subscribe(ws){
+  // Deriv public market-data WebSocket requires no account login.
+  ws.send(JSON.stringify({active_symbols:'brief',req_id:1}));
+  ws.send(JSON.stringify({ticks_history:state.symbol,count:100,end:'latest',style:'ticks',subscribe:0,req_id:3}));
   ws.send(JSON.stringify({ticks:state.symbol,subscribe:1,req_id:2}));
-  ws.send(JSON.stringify({ticks_history:state.symbol,count:100,end:'latest',style:'ticks',req_id:3}));
 }
 
 function connect(feedIndex=0){
@@ -116,9 +118,13 @@ function connect(feedIndex=0){
   ws.onmessage=e=>{
     try{
       const d=JSON.parse(e.data);
-      if(d.error){setConn('Deriv data error');return}
+      if(d.error){setConn('Deriv API error: '+(d.error.message||'request rejected'));return}
       if(d.msg_type==='history'&&d.history?.prices)loadHistory(d.history.prices);
       if(d.msg_type==='tick'&&d.tick)onTick(d.tick);
+      if(d.msg_type==='active_symbols') {
+        const ok=(d.active_symbols||[]).some(x=>(x.underlying_symbol||x.symbol)===state.symbol);
+        if(!ok) setConn('Selected market unavailable');
+      }
     }catch(_){}
   };
   ws.onerror=()=>{
