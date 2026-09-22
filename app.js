@@ -1,67 +1,12 @@
-(() => {
-'use strict';
-const $=id=>document.getElementById(id);
-const state={ws:null,symbol:'1HZ90V',prices:[],digits:Array(10).fill(0),stake:.25,contract:'EVENODD',mode:'AUTO',balance:10000,net:0,wins:0,losses:0,pending:null,stopped:false,reconnect:null,tickSerial:77};
-const ui={grid:$('digitGrid'),price:$('price'),change:$('change'),marketName:$('marketName'),canvas:$('chartCanvas'),connection:$('connection'),tickCount:$('tickCount'),stake:$('stake'),net:$('sessionNet'),session:$('sessionCount'),left:$('choiceLeft'),right:$('choiceRight'),target:$('targetProfit'),loss:$('stopLoss'),mult:$('multiplier'),scale1:$('scale1'),scale2:$('scale2'),scale3:$('scale3'),scale4:$('scale4')};
-function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');clearTimeout(window.__toast);window.__toast=setTimeout(()=>e.classList.remove('show'),1800)}
-function fmt(n){return Number(n).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}
-function lastDigit(q){const s=String(q);const m=s.replace(/\D/g,'');return m?Number(m.at(-1)):null}
-function setConn(t,ok=false){ui.connection.textContent='● '+t;ui.connection.style.color=ok?'#08e39b':'#f0ca17'}
-function currentLabel(){
-  if(state.contract==='OVERUNDER') return state.lastSide==='right'?'UNDER':'OVER';
-  if(state.contract==='MATCHES') return state.lastSide==='right'?'DIFFERS':'MATCHES';
-  return state.lastSide==='right'?'ODD':'EVEN';
-}
-function choiceLabels(){
-  if(state.contract==='OVERUNDER') return ['OVER','UNDER'];
-  if(state.contract==='MATCHES') return ['MATCHES','DIFFERS'];
-  return ['EVEN','ODD'];
-}
-function updateActionButtons(){
-  const [left,right]=choiceLabels();
-  const active=state.pending ? currentLabel() : null;
-  ui.left.className='trade-action'+(active===left?' active-stop':'');
-  ui.right.className='trade-action odd-action'+(active===right?' active-stop':'');
-  ui.left.innerHTML=active===left?'STOP <small>Stop trading</small>':`${left} <small>Payout 98.23%</small>`;
-  ui.right.innerHTML=active===right?'STOP <small>Stop trading</small>':`${right} <small>Payout 98.23%</small>`;
-}
-function updateDigits(){
-  const total=state.digits.reduce((a,b)=>a+b,0); if(!total)return;
-  const p=state.digits.map(v=>v/total*100);
-  let hi=0,lo=1;
-  for(let i=1;i<10;i++) if(p[i]>p[hi]) hi=i;
-  for(let i=0;i<10;i++) if(i!==hi && (p[i]<p[lo] || lo===hi)) lo=i;
-  ui.grid.innerHTML=p.map((v,i)=>`<div class="digit ${i===hi?'green':''} ${i===lo?'red':''}"><b>${i}</b><small>${v.toFixed(1)}%</small></div>`).join('');
-}
-function drawChart(){const c=ui.canvas,ctx=c.getContext('2d'),dpr=devicePixelRatio||1,w=c.clientWidth,h=c.clientHeight;if(!w||!h)return;c.width=w*dpr;c.height=h*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);const p=state.prices.slice(-90);if(p.length<2)return;const min=Math.min(...p),max=Math.max(...p),r=max-min||1;ctx.strokeStyle='#183b70';ctx.lineWidth=1;for(let i=1;i<7;i++){const y=i*h/7;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke()}ctx.beginPath();p.forEach((v,i)=>{const x=i*(w-8)/(p.length-1)+4,y=h-18-(v-min)/r*(h-35);i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.strokeStyle='#f4f6ff';ctx.lineWidth=2.3;ctx.stroke()}
-function updateScales(){if(!state.prices.length)return;const p=state.prices.slice(-50),max=Math.max(...p),min=Math.min(...p),r=max-min||1;ui.scale1.textContent=fmt(max);ui.scale2.textContent=fmt(max-r*.33);ui.scale3.textContent=fmt(max-r*.66);ui.scale4.textContent=fmt(min)}
-function onTick(t){const q=Number(t.quote);if(!Number.isFinite(q))return;const prev=state.prices.at(-1);state.prices.push(q);if(state.prices.length>120)state.prices.shift();const d=lastDigit(q);if(d!==null)state.digits[d]++;ui.price.textContent=fmt(q);ui.change.textContent=`${!prev||q>=prev?'↑':'↓'} ${(prev?Math.abs((q-prev)/prev*100):0).toFixed(2)}%`;ui.tickCount.textContent=state.prices.length+' ticks';updateDigits();drawChart();updateScales();if(state.pending)settle(q)}
-function loadHistory(prices){state.prices=prices.map(Number).filter(Number.isFinite).slice(-100);state.digits=Array(10).fill(0);state.prices.forEach(q=>{const d=lastDigit(q);if(d!==null)state.digits[d]++});updateDigits();drawChart();updateScales();if(state.prices.length)ui.price.textContent=fmt(state.prices.at(-1));ui.tickCount.textContent=state.prices.length+' ticks'}
-function subscribe(){const ws=state.ws;if(!ws||ws.readyState!==WebSocket.OPEN)return;ws.send(JSON.stringify({ticks_history:state.symbol,count:100,end:'latest',style:'ticks',subscribe:0,req_id:1}));ws.send(JSON.stringify({ticks:state.symbol,subscribe:1,req_id:2}))}
-function connect(){clearTimeout(state.reconnect);setConn('Connecting…');const ws=new WebSocket('wss://api.derivws.com/trading/v1/options/ws/public');state.ws=ws;ws.onopen=()=>{setConn('Live market connected',true);subscribe()};ws.onmessage=e=>{try{const d=JSON.parse(e.data);if(d.error){setConn('Deriv data error');console.warn(d.error);return}if(d.msg_type==='history'&&d.history?.prices)loadHistory(d.history.prices);if(d.msg_type==='tick'&&d.tick)onTick(d.tick)}catch(err){console.warn(err)}};ws.onerror=()=>setConn('Connection error');ws.onclose=()=>{setConn('Reconnecting…');state.reconnect=setTimeout(connect,2500)}}
-function setStake(v){state.stake=Math.max(.25,Math.min(100,Math.round(v*100)/100));ui.stake.textContent=state.stake.toFixed(2)}
-function setContract(c){if(state.pending){toast('Stop the active trade first.');return}state.contract=c;document.querySelectorAll('.contract-tabs button').forEach(b=>b.classList.toggle('active',b.dataset.contract===c));updateActionButtons()}
-function startTrade(side){
-  if(state.pending){ if(side===state.pending.side) stopActiveTrade(); return; }
-  if(state.stopped){toast('Trading is stopped.');return}
-  if(!state.prices.length){toast('Waiting for live market data.');return}
-  if(state.balance<state.stake){toast('Demo balance is too low.');return}
-  state.lastSide=side==='ODD'||side==='UNDER'||side==='DIFFERS'?'right':'left';
-  state.balance-=state.stake;
-  state.pending={side,entry:state.prices.at(-1),stake:state.stake,contract:state.contract};
-  updateActionButtons();
-  toast(side+' demo trade started');
-}
-function stopActiveTrade(){if(!state.pending)return;state.pending=null;updateActionButtons();toast('Active trade stopped');}
-function settle(q){const t=state.pending;if(!t)return;const d=lastDigit(q);let win=false;if(t.contract==='EVENODD')win=t.side==='EVEN'?d%2===0:d%2===1;else if(t.contract==='OVERUNDER')win=t.side==='OVER'?d>=5:d<=4;else win=t.side==='MATCHES'?d===0:d!==0;const mult=Math.max(.01,Number(ui.mult.value)||2);const profit=win?t.stake*mult:0;state.pending=null;state.tickSerial++;if(win){state.balance+=profit;state.net+=profit-state.stake;state.wins++}else{state.losses++;state.net-=state.stake}ui.net.textContent=(state.net>=0?'+$':'-$')+Math.abs(state.net).toFixed(2);ui.session.textContent=`${state.tickSerial} - ${state.wins}W - ${state.losses}L`;updateActionButtons();checkLimits();toast(win?`WIN +$${(profit-state.stake).toFixed(2)}`:`LOSS -$${state.stake.toFixed(2)}`)}
-function checkLimits(){const target=Number(ui.target.value)||0,sl=Number(ui.loss.value)||0;if(target&&state.net>=target)state.stopped=true;if(sl&&state.net<=-sl)state.stopped=true}
-$('market').onchange=e=>{state.symbol=e.target.value;ui.marketName.textContent=e.target.options[e.target.selectedIndex].text;state.prices=[];state.digits=Array(10).fill(0);try{state.ws.close()}catch(_){}connect()};
-document.querySelectorAll('.contract-tabs button').forEach(b=>b.onclick=()=>setContract(b.dataset.contract));
-document.querySelectorAll('[data-delta]').forEach(b=>b.onclick=()=>setStake(state.stake+Number(b.dataset.delta)));
-document.querySelectorAll('[data-stake]').forEach(b=>b.onclick=()=>setStake(Number(b.dataset.stake)));
-ui.left.onclick=()=>startTrade(choiceLabels()[0]);
-ui.right.onclick=()=>startTrade(choiceLabels()[1]);
-$('autoMode').onclick=()=>{state.mode='AUTO';$('autoMode').classList.add('active');$('manualMode').classList.remove('active')};
-$('manualMode').onclick=()=>{state.mode='MANUAL';$('manualMode').classList.add('active');$('autoMode').classList.remove('active')};
-window.addEventListener('resize',drawChart);setStake(.25);updateActionButtons();connect();
-})();
+(()=>{const $=id=>document.getElementById(id);const s={ws:null,symbol:'1HZ90V',prices:[],digits:Array(10).fill(0),prev:null,red:0,green:1,stake:.25,net:0,w:0,l:0,active:null,stopped:false};const url='wss://ws.binaryws.com/websockets/v3';
+function digit(v){const x=String(v);const m=x.replace(/\D/g,'');return m?+m.at(-1):null}function fmt(v){return Number(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}function setStatus(t,ok=false){$('status').textContent='● '+t;$('status').style.color=ok?'#00dc91':'#ffd000'}
+function renderDigits(){const total=s.digits.reduce((a,b)=>a+b,0)||1;const p=s.digits.map(x=>x/total*100);$('digitRow').innerHTML=p.map((v,i)=>`<div class="digit ${i===s.red?'red':i===s.green?'green':''}"><b>${i}</b><small>${v.toFixed(1)}%</small></div>`).join('');const d=digit(s.prev);if(d!==null)$('cursor').style.left=(d*10+1)+'%';}
+function updateColors(){const p=s.digits.map((x,i)=>({i,v:x}));p.sort((a,b)=>b.v-a.v);s.green=p[0]?.i??1;s.red=p[p.length-1]?.i??0;if(s.green===s.red&&p[1])s.red=p[1].i;renderDigits()}
+function draw(){const c=$('chart'),ctx=c.getContext('2d'),w=c.clientWidth,h=c.clientHeight,dpr=devicePixelRatio||1;c.width=w*dpr;c.height=h*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);if(s.prices.length<2)return;const p=s.prices.slice(-80),mi=Math.min(...p),ma=Math.max(...p),r=ma-mi||1;ctx.strokeStyle='#eaf3ff';ctx.lineWidth=2;ctx.beginPath();p.forEach((v,i)=>{const x=i*(w-10)/(p.length-1)+5,y=h-10-(v-mi)/r*(h-20);i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.stroke()}
+function onTick(t){const q=Number(t.quote);if(!Number.isFinite(q))return;s.prev=q;s.prices.push(q);if(s.prices.length>120)s.prices.shift();const d=digit(q);if(d!==null)s.digits[d]++;$('price').textContent=fmt(q);$('marketName').textContent=$('market').selectedOptions[0].textContent.replace('Index','').trim();$('change').textContent='↑ 0.00%';$('ticks').textContent=s.prices.length+' ticks';updateColors();draw();if(s.active)settle(d,q)}
+function history(a){s.prices=a.map(Number).filter(Number.isFinite).slice(-100);s.digits=Array(10).fill(0);s.prices.forEach(v=>{const d=digit(v);if(d!==null)s.digits[d]++});s.prev=s.prices.at(-1);updateColors();draw()}
+function connect(){try{s.ws?.close()}catch(e){}setStatus('Connecting…');const ws=new WebSocket(url);s.ws=ws;ws.onopen=()=>{setStatus('Live market connected',true);ws.send(JSON.stringify({ticks_history:s.symbol,count:100,end:'latest',style:'ticks',req_id:1}));ws.send(JSON.stringify({ticks:s.symbol,subscribe:1,req_id:2}))};ws.onmessage=e=>{try{const d=JSON.parse(e.data);if(d.error){setStatus('Deriv error: '+(d.error.message||'request rejected'));return}if(d.history?.prices)history(d.history.prices);if(d.tick)onTick(d.tick)}catch(_){} };ws.onerror=()=>setStatus('Connection error');ws.onclose=()=>{setStatus('Reconnecting…');setTimeout(()=>{if(s.ws===ws)connect()},2500)}}
+function updateTradeLabels(){const c=document.querySelector('.contract-tabs .active')?.dataset.contract;if(c==='EVENODD'){$('leftTrade').firstChild.textContent='EVEN';$('rightTrade').firstChild.textContent='ODD'}else if(c==='OVERUNDER'){$('leftTrade').firstChild.textContent='OVER';$('rightTrade').firstChild.textContent='UNDER'}else{$('leftTrade').firstChild.textContent='MATCH';$('rightTrade').firstChild.textContent='DIFFER'}}
+function start(side){if(s.active){stopSide(s.active);return}const c=document.querySelector('.contract-tabs .active').dataset.contract;s.active=side;$('leftTrade').textContent=side==='left'?'STOP':'EVEN';$('rightTrade').textContent=side==='right'?'STOP':'ODD';$('leftTrade').className='trade '+(side==='left'?'yellow':'green');$('rightTrade').className='trade '+(side==='right'?'yellow':'yellow');}
+function stopSide(){s.active=null;updateTradeLabels();$('leftTrade').className='trade green';$('rightTrade').className='trade yellow'}function settle(d,q){if(d===null)return;const c=document.querySelector('.contract-tabs .active').dataset.contract;let win=false;if(c==='EVENODD')win=s.active==='left'?d%2===0:d%2===1;else if(c==='OVERUNDER')win=s.active==='left'?d>=4:d<=3;else win=s.active==='left';const stake=s.stake;const pnl=win?stake*.95:-stake;s.net+=pnl;win?s.w++:s.l++;$('pnl').textContent=(s.net>=0?'+$':'-$')+Math.abs(s.net).toFixed(2);$('sessionText').textContent=`77 - ${s.w}W - ${s.l}L`;if(s.w+s.l>0&&s.active){} }
+$('market').onchange=e=>{s.symbol=e.target.value;s.prices=[];s.digits=Array(10).fill(0);connect()};document.querySelectorAll('.contract-tabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.contract-tabs button').forEach(x=>x.classList.remove('active'));b.classList.add('active');stopSide();});$('leftTrade').onclick=()=>start('left');$('rightTrade').onclick=()=>start('right');$('stake').textContent=s.stake.toFixed(2);document.querySelector('.minus').onclick=()=>{$('stake').textContent=(s.stake=Math.max(.25,s.stake-.25)).toFixed(2)};document.querySelector('.plus').onclick=()=>{$('stake').textContent=(s.stake=Math.min(100,s.stake+.25)).toFixed(2)};document.querySelectorAll('.presets button').forEach(b=>b.onclick=()=>{$('stake').textContent=(s.stake=+b.textContent.slice(1)).toFixed(2)});window.onresize=draw;connect()})();
