@@ -1,12 +1,527 @@
-(()=>{const $=id=>document.getElementById(id);const s={ws:null,symbol:'1HZ90V',prices:[],digits:Array(10).fill(0),prev:null,red:0,green:1,stake:.25,net:0,w:0,l:0,active:null,stopped:false};const url='wss://ws.binaryws.com/websockets/v3';
-function digit(v){const x=String(v);const m=x.replace(/\D/g,'');return m?+m.at(-1):null}function fmt(v){return Number(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}function setStatus(t,ok=false){$('status').textContent='● '+t;$('status').style.color=ok?'#00dc91':'#ffd000'}
-function renderDigits(){const total=s.digits.reduce((a,b)=>a+b,0)||1;const p=s.digits.map(x=>x/total*100);$('digitRow').innerHTML=p.map((v,i)=>`<div class="digit ${i===s.red?'red':i===s.green?'green':''}"><b>${i}</b><small>${v.toFixed(1)}%</small></div>`).join('');const d=digit(s.prev);if(d!==null)$('cursor').style.left=(d*10+1)+'%';}
-function updateColors(){const p=s.digits.map((x,i)=>({i,v:x}));p.sort((a,b)=>b.v-a.v);s.green=p[0]?.i??1;s.red=p[p.length-1]?.i??0;if(s.green===s.red&&p[1])s.red=p[1].i;renderDigits()}
-function draw(){const c=$('chart'),ctx=c.getContext('2d'),w=c.clientWidth,h=c.clientHeight,dpr=devicePixelRatio||1;c.width=w*dpr;c.height=h*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);if(s.prices.length<2)return;const p=s.prices.slice(-80),mi=Math.min(...p),ma=Math.max(...p),r=ma-mi||1;ctx.strokeStyle='#eaf3ff';ctx.lineWidth=2;ctx.beginPath();p.forEach((v,i)=>{const x=i*(w-10)/(p.length-1)+5,y=h-10-(v-mi)/r*(h-20);i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.stroke()}
-function onTick(t){const q=Number(t.quote);if(!Number.isFinite(q))return;s.prev=q;s.prices.push(q);if(s.prices.length>120)s.prices.shift();const d=digit(q);if(d!==null)s.digits[d]++;$('price').textContent=fmt(q);$('marketName').textContent=$('market').selectedOptions[0].textContent.replace('Index','').trim();$('change').textContent='↑ 0.00%';$('ticks').textContent=s.prices.length+' ticks';updateColors();draw();if(s.active)settle(d,q)}
-function history(a){s.prices=a.map(Number).filter(Number.isFinite).slice(-100);s.digits=Array(10).fill(0);s.prices.forEach(v=>{const d=digit(v);if(d!==null)s.digits[d]++});s.prev=s.prices.at(-1);updateColors();draw()}
-function connect(){try{s.ws?.close()}catch(e){}setStatus('Connecting…');const ws=new WebSocket(url);s.ws=ws;ws.onopen=()=>{setStatus('Live market connected',true);ws.send(JSON.stringify({ticks_history:s.symbol,count:100,end:'latest',style:'ticks',req_id:1}));ws.send(JSON.stringify({ticks:s.symbol,subscribe:1,req_id:2}))};ws.onmessage=e=>{try{const d=JSON.parse(e.data);if(d.error){setStatus('Deriv error: '+(d.error.message||'request rejected'));return}if(d.history?.prices)history(d.history.prices);if(d.tick)onTick(d.tick)}catch(_){} };ws.onerror=()=>setStatus('Connection error');ws.onclose=()=>{setStatus('Reconnecting…');setTimeout(()=>{if(s.ws===ws)connect()},2500)}}
-function updateTradeLabels(){const c=document.querySelector('.contract-tabs .active')?.dataset.contract;if(c==='EVENODD'){$('leftTrade').firstChild.textContent='EVEN';$('rightTrade').firstChild.textContent='ODD'}else if(c==='OVERUNDER'){$('leftTrade').firstChild.textContent='OVER';$('rightTrade').firstChild.textContent='UNDER'}else{$('leftTrade').firstChild.textContent='MATCH';$('rightTrade').firstChild.textContent='DIFFER'}}
-function start(side){if(s.active){stopSide(s.active);return}const c=document.querySelector('.contract-tabs .active').dataset.contract;s.active=side;$('leftTrade').textContent=side==='left'?'STOP':'EVEN';$('rightTrade').textContent=side==='right'?'STOP':'ODD';$('leftTrade').className='trade '+(side==='left'?'yellow':'green');$('rightTrade').className='trade '+(side==='right'?'yellow':'yellow');}
-function stopSide(){s.active=null;updateTradeLabels();$('leftTrade').className='trade green';$('rightTrade').className='trade yellow'}function settle(d,q){if(d===null)return;const c=document.querySelector('.contract-tabs .active').dataset.contract;let win=false;if(c==='EVENODD')win=s.active==='left'?d%2===0:d%2===1;else if(c==='OVERUNDER')win=s.active==='left'?d>=4:d<=3;else win=s.active==='left';const stake=s.stake;const pnl=win?stake*.95:-stake;s.net+=pnl;win?s.w++:s.l++;$('pnl').textContent=(s.net>=0?'+$':'-$')+Math.abs(s.net).toFixed(2);$('sessionText').textContent=`77 - ${s.w}W - ${s.l}L`;if(s.w+s.l>0&&s.active){} }
-$('market').onchange=e=>{s.symbol=e.target.value;s.prices=[];s.digits=Array(10).fill(0);connect()};document.querySelectorAll('.contract-tabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.contract-tabs button').forEach(x=>x.classList.remove('active'));b.classList.add('active');stopSide();});$('leftTrade').onclick=()=>start('left');$('rightTrade').onclick=()=>start('right');$('stake').textContent=s.stake.toFixed(2);document.querySelector('.minus').onclick=()=>{$('stake').textContent=(s.stake=Math.max(.25,s.stake-.25)).toFixed(2)};document.querySelector('.plus').onclick=()=>{$('stake').textContent=(s.stake=Math.min(100,s.stake+.25)).toFixed(2)};document.querySelectorAll('.presets button').forEach(b=>b.onclick=()=>{$('stake').textContent=(s.stake=+b.textContent.slice(1)).toFixed(2)});window.onresize=draw;connect()})();
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+
+const state = {
+  ws:null, publicSocket:null, reconnect:null, symbol:'1HZ100V',
+  prices:[], tickDigits:[], digits:Array(10).fill(0), pipSize:null, digitWindowSize:100, stake:1, stopLoss:999,
+  targetProfit:3, sessionNet:0, tradingLocked:false,
+  contract:'OVERUNDER', accountType:'demo', balance:10000,
+  currency:'USD', authenticated:false, accountId:null,
+  waitingForProposal:null, proposalReqId:0, buyReqId:0, contractReqId:0,
+  wins:0, losses:0, manual:false, multiplier:2, userStopped:false, autoRunning:false, autoSide:null, autoTimer:null, signalQuality:0, signalReady:false
+};
+
+const DERIV_CLIENT_ID='34m6kBZ1JQGXBHSscpXXQ';
+const DERIV_API='https://api.derivws.com';
+const PUBLIC_WS='wss://api.derivws.com/trading/v1/options/ws/public';
+const REDIRECT_URI=window.location.origin+'/';
+const auth={token:sessionStorage.getItem('deriv_access_token')||null};
+
+const ui={
+  price:$('price'), digitGrid:$('digitGrid'), balance:$('balance'),
+  direction:$('direction'), confidence:$('confidence'), connection:$('headerConnectionText'),
+  payout:$('payout'), stake:$('stake'), connect:$('connectDeriv'),
+  accountType:$('accountType'), accountLabel:$('accountLabel'), headerConnectionText:$('headerConnectionText'), headerConnectionDot:$('headerConnectionDot'),
+  leftLabel:$('leftTradeLabel'), rightLabel:$('rightTradeLabel'),
+  leftRule:$('leftRule'), rightRule:$('rightRule'),
+  wins:$('wins'), losses:$('losses'), sessionNet:$('sessionNet'),
+  signalText:$('signalText'), riskStatus:$('riskStatus'), chart:$('chart'), strongestDigit:$('strongestDigit'), strongestPct:$('strongestPct'), digitBig:$('digitBig')
+};
+
+const fallback=[
+ ['1HZ5V','Vol 5 (1s)'],['1HZ10V','Vol 10 (1s)'],['1HZ15V','Vol 15 (1s)'],
+ ['1HZ25V','Vol 25 (1s)'],['1HZ30V','Vol 30 (1s)'],['1HZ50V','Vol 50 (1s)'],
+ ['1HZ75V','Vol 75 (1s)'],['1HZ90V','Vol 90 (1s)'],['1HZ100V','Vol 100 (1s)'],
+ ['1HZ150V','Vol 150 (1s)'],['1HZ250V','Vol 250 (1s)'],
+ ['R_10','Volatility 10'],['R_25','Volatility 25'],['R_50','Volatility 50'],
+ ['R_75','Volatility 75'],['R_100','Volatility 100']
+];
+
+function toast(t){const e=$('toast');if(!e)return;e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2200)}
+function fmt(n){return Number(n).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}
+function lastDigit(n,pipSize=state.pipSize){
+  const q=Number(n); if(!Number.isFinite(q)) return null;
+  const p=Number.isInteger(pipSize)?pipSize:null;
+  if(p!==null){
+    const fixed=q.toFixed(p);
+    const m=fixed.replace(/\D/g,'');
+    return m?Number(m.at(-1)):null;
+  }
+  const m=String(n).replace(/\D/g,'');
+  return m?Number(m.at(-1)):null;
+}
+function setConnection(text,ok=false){if(ui.connection){ui.connection.textContent=ok?'Deriv Connected':(text==='LIVE'?'Market Live':'Not Connected');ui.connection.style.color=ok?'#2ce795':'#ffc857'}if(ui.headerConnectionText){ui.headerConnectionText.textContent=ok?'Deriv Connected':(text==='LIVE'?'Market Live':'Not Connected')}if(ui.headerConnectionDot){ui.headerConnectionDot.style.background=ok?'#18f08b':(text==='LIVE'?'#18f08b':'#ffc857')}}
+function readRisk(){state.stopLoss=Math.max(0,Number($('stopLoss').value)||0);state.targetProfit=Math.max(0,Number($('targetProfit').value)||0);state.multiplier=Math.max(1,Number($('multiplier').value)||1)}
+function updateStopButton(){
+  const b=$('stopTrade');
+  if(!b)return;
+  b.textContent=state.userStopped?'▶ START':'■ STOP';
+  b.classList.toggle('stopped',state.userStopped);
+}
+function riskUpdate(){
+  readRisk();
+  if(state.stopLoss>0&&state.sessionNet<=-state.stopLoss)state.tradingLocked=true;
+  if(state.targetProfit>0&&state.sessionNet>=state.targetProfit)state.tradingLocked=true;
+  if(state.userStopped)state.tradingLocked=true;
+  ui.riskStatus.textContent=state.userStopped?'Trading stopped manually':(state.tradingLocked?'Trading paused':'Risk limits active');
+  updateStopButton();
+  ui.sessionNet.textContent=(state.sessionNet>=0?'+$':'-$')+Math.abs(state.sessionNet).toFixed(2);
+}
+function mostEven(){let e=0,o=0;for(let i=0;i<10;i++){if(i%2)o+=state.digits[i];else e+=state.digits[i]}return e>=o}
+function strongestDigit(){let best=0;for(let i=1;i<10;i++)if(state.digits[i]>state.digits[best])best=i;return best}
+
+function signalFilter(info){
+  const p=state.prices.slice(-30);
+  if(p.length<12)return{ready:false,score:0,reason:'Collecting more market data…'};
+  const total=state.digits.reduce((a,b)=>a+b,0)||1;
+  const even=state.digits.reduce((a,b,i)=>a+(i%2===0?b:0),0)/total*100;
+  const odd=100-even;
+  let score=50;
+  const delta=Number(p.at(-1))-Number(p[0]);
+  const h=Math.floor(p.length/2);
+  const av1=p.slice(0,h).reduce((a,b)=>a+b,0)/h;
+  const av2=p.slice(h).reduce((a,b)=>a+b,0)/(p.length-h);
+  if((delta>0&&av2>=av1)||(delta<0&&av2<=av1))score+=12;
+  if(state.contract==='EVENODD'){
+    const edge=mostEven()?even:odd;
+    score+=edge>=54?10:-10;
+  }else if(state.contract==='MATCHDIFF'){
+    const hi=info?.hi??strongestDigit();
+    const edge=state.digits[hi]/total*100;
+    score+=edge>=14?8:-5;
+  }else{
+    score+=Math.min(10,Math.abs(delta/Math.max(Math.abs(p[0]),1))*100000*1.5);
+  }
+  const recent=p.slice(-8).map(lastDigit).filter(Number.isInteger);
+  if(state.contract==='EVENODD'&&recent.length>=6){
+    const same=recent.filter(d=>d%2===recent.at(-1)%2).length/recent.length;
+    if(same>=0.75)score-=8;
+  }
+  score=Math.max(0,Math.min(100,Math.round(score)));
+  return{ready:score>=70,score,reason:score>=70?'Multiple filters agree.':'Filters do not agree strongly enough.'};
+}
+
+function drawChart(){
+  const c=ui.chart,ctx=c.getContext('2d'),r=c.getBoundingClientRect(),d=devicePixelRatio||1;
+  c.width=r.width*d;c.height=r.height*d;ctx.setTransform(d,0,0,d,0,0);ctx.clearRect(0,0,r.width,r.height);
+  const p=state.prices.slice(-55);if(p.length<2)return;
+  const min=Math.min(...p),max=Math.max(...p),span=max-min||1;
+  ctx.beginPath();
+  p.forEach((v,i)=>{const x=i*(r.width/(p.length-1)),y=r.height-12-((v-min)/span)*(r.height-28);i?ctx.lineTo(x,y):ctx.moveTo(x,y)});
+  ctx.strokeStyle='#f4f0ff';ctx.lineWidth=3;ctx.stroke();
+}
+
+function updateDigits(){
+  const total=state.digits.reduce((a,b)=>a+b,0);if(!total)return;
+  const probs=state.digits.map(n=>n/total*100),hi=probs.indexOf(Math.max(...probs));
+  const current=state.prices.length?lastDigit(state.prices.at(-1)):null;
+  ui.digitGrid.innerHTML=probs.map((v,i)=>`<div class="digit ${i===hi?'high':''} ${i===current?'current':''}" data-digit="${i}"><b>${i}</b><small>${v.toFixed(1)}%</small></div>`).join('');
+  if(ui.strongestDigit)ui.strongestDigit.textContent=hi;
+  if(ui.strongestPct)ui.strongestPct.textContent='('+probs[hi].toFixed(1)+'%)';
+  if(ui.digitBig)ui.digitBig.textContent=Number.isInteger(current)?current:'—';
+  if(Number.isInteger(current)){const cursor=document.createElement('div');cursor.className='digit-cursor';cursor.style.left=((current+.5)*10)+'%';ui.digitGrid.appendChild(cursor)}
+  return {probs,hi,current};
+}
+
+function analyze(){
+  if(state.prices.length<8)return;
+  const p=state.prices.slice(-30),a=p[0],b=p.at(-1),delta=b-a,half=Math.floor(p.length/2);
+  const av1=p.slice(0,half).reduce((s,v)=>s+v,0)/half;
+  const av2=p.slice(half).reduce((s,v)=>s+v,0)/(p.length-half);
+  const bull=delta>0&&av2>=av1,bear=delta<0&&av2<=av1;
+  const info=updateDigits()||{probs:Array(10).fill(10),hi:0,current:lastDigit(b)};
+  let dir='WAIT',text='Waiting for live market data.';
+  if(state.contract==='OVERUNDER')dir=bull?'OVER':bear?'UNDER':'WAIT';
+  else if(state.contract==='RISEFALL')dir=bull?'RISE':bear?'FALL':'WAIT';
+  else if(state.contract==='EVENODD')dir=mostEven()?'EVEN':'ODD';
+  else {const target=info.hi;dir=info.current===target?'MATCH':'DIFFER'}
+  const baseConf=55+Math.min(40,Math.abs(delta/Math.max(a,1))*100000*6);
+  const filtered=signalFilter(info);state.signalQuality=filtered.score;state.signalReady=filtered.ready;
+  const conf=filtered.ready?Math.max(55,Math.min(95,Math.round(baseConf))):Math.min(69,Math.max(50,Math.round(50+filtered.score/5)));
+  ui.direction.textContent=dir;ui.confidence.textContent=conf+'%';
+  const statusEl=$('signalStatus'); if(statusEl){statusEl.textContent=filtered.ready?'STRONG':'WAIT';statusEl.style.color=filtered.ready?'#00ef8a':'#ffd21a';}
+  const clock=$('scanTime'); if(clock)clock.textContent=new Date().toLocaleTimeString();
+  text=dir==='WAIT'?'No strong direction yet.':`Live ${state.contract==='MATCHDIFF'?'digit': 'market'} signal: ${dir}.`;
+  ui.signalText.textContent=filtered.ready?text+' Filter: STRONG.':text+' Filter: WAIT — '+filtered.reason;
+  drawChart();
+}
+
+function onTick(t){
+  const q=Number(t.quote);if(!Number.isFinite(q))return;
+  state.prices.push(q);if(state.prices.length>120)state.prices.shift();
+  const d=lastDigit(q,state.pipSize);
+  if(d!==null){
+    state.tickDigits.push(d);
+    if(state.tickDigits.length>state.digitWindowSize)state.tickDigits.shift();
+    state.digits=Array(10).fill(0);
+    state.tickDigits.forEach(x=>state.digits[x]++);
+  }
+  ui.price.textContent=fmt(q);analyze();
+}
+
+function subscribePublic(ws){
+  ws.send(JSON.stringify({active_symbols:'brief',product_type:'basic',req_id:1}));
+  ws.send(JSON.stringify({ticks:state.symbol,subscribe:1,req_id:2}));
+  ws.send(JSON.stringify({ticks_history:state.symbol,count:100,end:'latest',style:'ticks',req_id:3}));
+}
+function connectPublic(){
+  try{state.publicSocket?.close()}catch{}
+  setConnection('CONNECTING…');const ws=new WebSocket(PUBLIC_WS);state.publicSocket=ws;let opened=false;
+  ws.onopen=()=>{opened=true;setConnection('LIVE',true);subscribePublic(ws)};
+  ws.onmessage=e=>{try{const d=JSON.parse(e.data);if(d.msg_type==='tick'&&d.tick)onTick(d.tick);if(d.msg_type==='history'&&d.history?.prices){state.pipSize=Number.isInteger(d.history.pip_size)?Number(d.history.pip_size):state.pipSize;
+      state.prices=d.history.prices.map(Number).filter(Number.isFinite).slice(-120);
+      state.tickDigits=state.prices.slice(-state.digitWindowSize).map(v=>lastDigit(v,state.pipSize)).filter(Number.isInteger);
+      state.digits=Array(10).fill(0);state.tickDigits.forEach(z=>state.digits[z]++);analyze()}if(d.msg_type==='active_symbols'&&Array.isArray(d.active_symbols))populateMarkets(d.active_symbols)}catch{}};
+  ws.onerror=()=>{if(!opened)setConnection('CONNECTION ERROR')};
+  ws.onclose=()=>{setConnection('RECONNECTING…');clearTimeout(state.reconnect);state.reconnect=setTimeout(connectPublic,3000)};
+}
+function populateMarkets(items){
+  const merged=new Map(fallback.map(x=>[x[0],x[1]]));
+  (items||[]).forEach(x=>{
+    const n=x.display_name||x.underlying_symbol_name||'';
+    const sym=x.symbol||x.underlying_symbol;
+    if(sym&&/Volatility/i.test(n))merged.set(sym,n);
+  });
+  const sel=$('market');const cur=state.symbol;sel.innerHTML=[...merged].map(([v,n])=>`<option value="${v}">${n}</option>`).join('');sel.value=merged.has(cur)?cur:state.symbol;
+}
+
+function base64Url(bytes){return btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}
+async function sha256(text){const h=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));return base64Url(new Uint8Array(h))}
+function randomString(n=64){const chars='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~',a=new Uint8Array(n);crypto.getRandomValues(a);return Array.from(a,v=>chars[v%chars.length]).join('')}
+async function startOAuth(){
+  const verifier=randomString(),stateVal=randomString(32);sessionStorage.setItem('pkce_code_verifier',verifier);sessionStorage.setItem('oauth_state',stateVal);
+  const u=new URL('https://auth.deriv.com/oauth2/auth');u.searchParams.set('response_type','code');u.searchParams.set('client_id',DERIV_CLIENT_ID);u.searchParams.set('redirect_uri',REDIRECT_URI);u.searchParams.set('scope','trade');u.searchParams.set('state',stateVal);u.searchParams.set('code_challenge',await sha256(verifier));u.searchParams.set('code_challenge_method','S256');location.href=u;
+}
+function derivError(stage,e){
+  const msg=String(e?.message||e||'Unknown error').replace(/\s+/g,' ').trim().slice(0,180);
+  console.error('FXTRADE Deriv '+stage, e);
+  setConnection('ERROR — '+stage,false);
+  toast('Deriv '+stage+' failed: '+msg);
+}
+async function finishOAuth(){
+  const q=new URLSearchParams(location.search);
+  const oauthError=q.get('error');
+  const oauthDescription=q.get('error_description');
+  const code=q.get('code');
+  const returned=q.get('state');
+  if(oauthError){
+    derivError('LOGIN',new Error(oauthDescription||oauthError));
+    return false;
+  }
+  if(!code)return false;
+  if(returned!==sessionStorage.getItem('oauth_state')){
+    derivError('STATE',new Error('Returned OAuth state does not match.'));
+    return false;
+  }
+  const verifier=sessionStorage.getItem('pkce_code_verifier');
+  if(!verifier){
+    derivError('PKCE',new Error('The saved PKCE verifier is missing. Please start Connect Deriv again.'));
+    return false;
+  }
+  try{
+    setConnection('AUTHORIZING…');
+    const r=await fetch('/api/oauth/token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,code_verifier:verifier,redirect_uri:REDIRECT_URI,client_id:DERIV_CLIENT_ID})});
+    const text=await r.text();
+    let d={};try{d=JSON.parse(text)}catch{d={error:text||'Invalid token response'}}
+    if(!r.ok||!d.access_token)throw new Error(d.error_description||d.error||'Token exchange failed ('+r.status+')');
+    auth.token=d.access_token;
+    sessionStorage.setItem('deriv_access_token',auth.token);
+    sessionStorage.removeItem('pkce_code_verifier');
+    sessionStorage.removeItem('oauth_state');
+    history.replaceState({},'',location.pathname);
+    await loadAccounts();
+    return true;
+  }catch(e){
+    derivError('TOKEN',e);
+    return false;
+  }
+}
+function savedAccounts(){try{return JSON.parse(sessionStorage.getItem('deriv_accounts')||'{}')}catch{return{}}}
+function selectedAccount(){return savedAccounts()[state.accountType]||null}
+async function loadAccounts(){
+  if(!auth.token){derivError('ACCOUNT',new Error('No OAuth access token is available.'));return false}
+  try{
+    setConnection('LOADING ACCOUNT…');
+    const r=await fetch(DERIV_API+'/trading/v1/options/accounts',{headers:{Authorization:'Bearer '+auth.token}});
+    const text=await r.text();
+    let d={};try{d=JSON.parse(text)}catch{d={error:text||'Invalid account response'}}
+    if(!r.ok)throw new Error(d?.errors?.[0]?.message||d?.error_description||d?.error||'Account lookup failed ('+r.status+')');
+    const raw=Array.isArray(d.data)?d.data:(Array.isArray(d.data?.accounts)?d.data.accounts:[]);
+    const demo=raw.find(a=>String(a.account_type||a.type||'').toLowerCase()==='demo');
+    const real=raw.find(a=>String(a.account_type||a.type||'').toLowerCase()==='real');
+    sessionStorage.setItem('deriv_accounts',JSON.stringify({demo:demo||null,real:real||null}));
+    if(!demo&&!real)throw new Error('No Options demo/real account was returned by Deriv.');
+    await connectSelectedAccount();
+    return true;
+  }catch(e){derivError('ACCOUNT',e);return false}
+}
+async function connectSelectedAccount(){
+  const a=selectedAccount();
+  if(!auth.token){derivError('SESSION',new Error('No OAuth access token is available.'));return false}
+  if(!a){derivError('SESSION',new Error('No '+state.accountType+' Options account is available.'));return false}
+  state.accountId=a.account_id;state.currency=a.currency||'USD';
+  try{
+    setConnection('AUTHORIZING ACCOUNT…');
+    const r=await fetch(DERIV_API+'/trading/v1/options/accounts/'+encodeURIComponent(state.accountId)+'/otp',{method:'POST',headers:{Authorization:'Bearer '+auth.token}});
+    const text=await r.text();
+    let d={};try{d=JSON.parse(text)}catch{d={error:text||'Invalid OTP response'}}
+    if(!r.ok||!d.data?.url)throw new Error(d?.errors?.[0]?.message||d?.error_description||d?.error||'Could not create Deriv session ('+r.status+')');
+    const ws=new WebSocket(d.data.url);state.ws=ws;
+    ws.onopen=()=>{state.authenticated=true;ui.connect.textContent='Deriv Connected';ui.connect.classList.add('connected');ui.accountLabel.textContent=state.accountType==='real'?'Real Account':'Demo Account';setConnection('DERIV '+state.accountType.toUpperCase(),true);ws.send(JSON.stringify({balance:1,subscribe:1,req_id:500}));ws.send(JSON.stringify({ticks:state.symbol,subscribe:1,req_id:501}))};
+    ws.onmessage=e=>{try{const d=JSON.parse(e.data);if(d.error){if(d.req_id===state.proposalReqId||d.req_id===state.buyReqId)state.waitingForProposal=null;toast(d.error.message||'Deriv request failed.');return}if(d.msg_type==='balance'&&d.balance){state.balance=Number(d.balance.balance);ui.balance.textContent='$'+state.balance.toFixed(2)}if(d.msg_type==='tick'&&d.tick)onTick(d.tick);if(d.msg_type==='proposal'&&d.req_id===state.proposalReqId)handleProposal(d);if(d.msg_type==='buy'&&d.req_id===state.buyReqId)handleBuy(d);if(d.msg_type==='proposal_open_contract'&&d.req_id===state.contractReqId)handleContractUpdate(d)}catch{}};
+    ws.onerror=()=>{setConnection('DERIV ERROR');toast('Deriv authenticated WebSocket reported an error.')};
+    ws.onclose=e=>{state.authenticated=false;ui.connect.textContent='Connect Deriv';ui.connect.classList.remove('connected');setConnection('DISCONNECTED');if(e.code!==1000)toast('Deriv session closed ('+e.code+'). '+(e.reason||''))};
+    return true;
+  }catch(e){derivError('SESSION',e);return false}
+}
+function contractRequest(side){
+  if(state.contract==='MATCHDIFF'){const barrier=String(lastDigit(state.prices.at(-1))??strongestDigit());return{contract_type:side==='left'?'DIGITMATCH':'DIGITDIFF',barrier}}
+  if(state.contract==='EVENODD')return{contract_type:side==='left'?'DIGITEVEN':'DIGITODD'}
+  if(state.contract==='OVERUNDER')return{contract_type:side==='left'?'DIGITOVER':'DIGITUNDER',barrier:side==='left'?'3':'4'}
+  return{contract_type:side==='left'?'CALL':'PUT'}
+}
+function placeTrade(side, fromAuto=false){
+  readRisk();riskUpdate();if(state.tradingLocked)return;
+  if(!state.signalReady){
+    if(fromAuto){clearTimeout(state.autoTimer);state.autoTimer=setTimeout(()=>placeTrade(side,true),1200);return;}
+    toast('Signal filter says WAIT — no trade placed.');return;
+  }
+  if(!auth.token||!state.ws||!state.authenticated){toast('Connect Deriv before trading.');return}
+  if(state.waitingForProposal){toast('Please wait for the previous trade request.');return}
+  const account=selectedAccount();if(!account){toast('Selected Deriv account is unavailable.');return}
+  const c=contractRequest(side),stake=Number(state.stake);if(!stake||stake<=0)return;
+  state.proposalReqId++;state.waitingForProposal={side,stake,symbol:state.symbol,contractType:c.contract_type};
+  const req={proposal:1,amount:stake,basis:'stake',contract_type:c.contract_type,currency:state.currency,duration:1,duration_unit:'t',underlying_symbol:state.symbol,req_id:state.proposalReqId};if(c.barrier!==undefined)req.barrier=c.barrier;state.ws.send(JSON.stringify(req));
+  document.querySelectorAll('.trade').forEach(b=>b.classList.remove('selected'));$(side==='left'?'over':'under').classList.add('selected');
+}
+function handleProposal(d){const p=d.proposal,t=state.waitingForProposal;if(!p||!t)return;const ask=Number(p.ask_price);if(!p.id||!Number.isFinite(ask)){state.waitingForProposal=null;toast('Invalid Deriv proposal.');return}ui.payout.textContent='$'+Number(p.payout??ask*1.96).toFixed(2);state.buyReqId++;state.ws.send(JSON.stringify({buy:String(p.id),price:ask,req_id:state.buyReqId}))}
+function handleBuy(d){const t=state.waitingForProposal;if(!t||!d.buy?.contract_id){state.waitingForProposal=null;return}state.ws.send(JSON.stringify({proposal_open_contract:1,contract_id:d.buy.contract_id,subscribe:1,req_id:++state.contractReqId}));ui.payout.textContent='$'+Number(d.buy.payout||0).toFixed(2);toast((state.accountType==='real'?'REAL ':'DEMO ')+'trade placed.');state.waitingForProposal={...t,contractId:d.buy.contract_id}}
+function handleContractUpdate(d){
+  const c=d.proposal_open_contract;if(!c||!state.waitingForProposal)return;
+  const closed=c.is_sold===1||c.status==='sold'||c.status==='expired';if(!closed)return;
+  const profit=Number(c.profit||0);state.sessionNet+=Number.isFinite(profit)?profit:0;
+  if(profit>0)state.wins++;else state.losses++;ui.wins.textContent=state.wins+' W';ui.losses.textContent=state.losses+' L';state.waitingForProposal=null;riskUpdate();
+  toast(profit>0?'WIN +$'+profit.toFixed(2):'LOSS -$'+Math.abs(profit).toFixed(2));
+  if(state.autoRunning && !state.tradingLocked && state.autoSide){
+    clearTimeout(state.autoTimer);
+    state.autoTimer=setTimeout(()=>placeTrade(state.autoSide,true),900);
+  }
+}
+
+function setStake(v){state.stake=Math.max(1,Math.min(100,Number(v)||1));ui.stake.textContent=state.stake;ui.payout.textContent='$'+(state.stake*1.96).toFixed(2)}
+function updateLabels(){
+  if(state.contract==='MATCHDIFF'){ui.leftLabel.textContent='MATCH';ui.rightLabel.textContent='DIFFER';ui.leftRule.textContent='Current digit';ui.rightRule.textContent='Other digits'}
+  else if(state.contract==='EVENODD'){ui.leftLabel.textContent='EVEN';ui.rightLabel.textContent='ODD';ui.leftRule.textContent='0, 2, 4, 6, 8';ui.rightRule.textContent='1, 3, 5, 7, 9'}
+  else if(state.contract==='OVERUNDER'){ui.leftLabel.textContent='OVER';ui.rightLabel.textContent='UNDER';ui.leftRule.textContent='Digits 4 - 9';ui.rightRule.textContent='Digits 0 - 3'}
+  else{ui.leftLabel.textContent='RISE';ui.rightLabel.textContent='FALL';ui.leftRule.textContent='Price goes up';ui.rightRule.textContent='Price goes down'}
+}
+
+document.querySelectorAll('.contract').forEach(b=>b.onclick=()=>{document.querySelectorAll('.contract').forEach(x=>x.classList.remove('active'));b.classList.add('active');state.contract=b.dataset.contract;updateLabels();analyze()});
+document.querySelectorAll('[data-delta]').forEach(b=>b.onclick=()=>setStake(state.stake+Number(b.dataset.delta)));
+document.querySelectorAll('[data-stake]').forEach(b=>b.onclick=()=>setStake(Number(b.dataset.stake)));
+function startAutoTrade(side){
+  if(state.autoRunning)return;
+  readRisk(); state.userStopped=false; state.tradingLocked=false;
+  state.autoRunning=true; state.autoSide=side;
+  riskUpdate();
+  document.querySelectorAll('.trade').forEach(b=>b.classList.remove('selected'));
+  $(side==='left'?'over':'under').classList.add('selected');
+  toast('Auto trading started.');
+  placeTrade(side,true);
+}
+function stopAutoTrade(){
+  state.autoRunning=false; state.autoSide=null;
+  clearTimeout(state.autoTimer); state.autoTimer=null;
+  state.userStopped=true; state.tradingLocked=true;
+  riskUpdate();
+  toast('Trading stopped.');
+}
+$('over').onclick=()=>startAutoTrade('left');
+$('under').onclick=()=>startAutoTrade('right');
+$('stopTrade').onclick=()=>{
+  if(state.autoRunning || !state.userStopped) stopAutoTrade();
+  else { state.userStopped=false; state.tradingLocked=false; riskUpdate(); toast('Ready to trade.'); }
+};
+$('place').onclick=()=>{const s=ui.direction.textContent;if(['MATCH','OVER','RISE','EVEN'].includes(s))startAutoTrade('left');else if(['DIFFER','UNDER','FALL','ODD'].includes(s))startAutoTrade('right');else toast('AI says WAIT — no trade placed.')};
+$('reset').onclick=()=>{if(state.accountType==='real'){toast('Real balance cannot be reset.');return}state.sessionNet=0;state.userStopped=false;state.wins=0;state.losses=0;state.tradingLocked=false;ui.wins.textContent='0 W';ui.losses.textContent='0 L';riskUpdate();toast('Session reset.')};
+$('autoMode').onclick=()=>{state.manual=false;$('autoMode').classList.add('selected');$('manualMode').classList.remove('selected')};
+$('manualMode').onclick=()=>{state.manual=true;$('manualMode').classList.add('selected');$('autoMode').classList.remove('selected')};
+$('connectDeriv').onclick=()=>auth.token?loadAccounts():startOAuth();
+$('accountType').onchange=async e=>{state.accountType=e.target.value;sessionStorage.setItem('deriv_account_type',state.accountType);if(auth.token)await connectSelectedAccount();else{$('accountType').value='demo';state.accountType='demo';toast('Connect Deriv first.')}};
+$('market').onchange=e=>{state.symbol=e.target.value;state.prices=[];state.digits=Array(10).fill(0);connectPublic()};
+$('stopLoss').oninput=riskUpdate;$('targetProfit').oninput=riskUpdate;$('multiplier').onchange=readRisk;
+document.querySelectorAll('[data-risk]').forEach(b=>b.onclick=()=>{const id=b.dataset.risk;const el=$(id);if(!el)return;el.value=Math.max(0,Number(el.value||0)+Number(b.dataset.change||0));el.dispatchEvent(new Event('input',{bubbles:true}))});
+let tickCount=1; $('tickMinus').onclick=()=>{tickCount=Math.max(1,tickCount-1);$('ticksValue').textContent=tickCount}; $('tickPlus').onclick=()=>{tickCount=Math.min(10,tickCount+1);$('ticksValue').textContent=tickCount};
+window.addEventListener('resize',drawChart);
+
+
+/* ================= FXTRADE AI SCANNER BACKTEST =================
+   Uses Deriv's public historical tick data. It evaluates the scanner
+   one tick at a time: signal uses only ticks already known at that
+   moment, and the following tick is the outcome.
+*/
+function scannerBacktestOutcome(signal, nextDigit, targetDigit){
+  if(signal==='OVER') return nextDigit>=4;
+  if(signal==='UNDER') return nextDigit<=3;
+  if(signal==='EVEN') return nextDigit%2===0;
+  if(signal==='ODD') return nextDigit%2===1;
+  if(signal==='MATCH') return nextDigit===targetDigit;
+  if(signal==='DIFFER') return nextDigit!==targetDigit;
+  return null;
+}
+
+function scannerBacktestSignal(prices, digits){
+  if(prices.length<30)return null;
+
+  const p=prices.slice(-30);
+  const a=p[0], b=p.at(-1), delta=b-a, half=Math.floor(p.length/2);
+  const av1=p.slice(0,half).reduce((s,v)=>s+v,0)/half;
+  const av2=p.slice(half).reduce((s,v)=>s+v,0)/(p.length-half);
+  const bull=delta>0&&av2>=av1, bear=delta<0&&av2<=av1;
+
+  let dir='WAIT';
+  if(state.contract==='OVERUNDER') dir=bull?'OVER':bear?'UNDER':'WAIT';
+  else if(state.contract==='RISEFALL') dir=bull?'RISE':bear?'FALL':'WAIT';
+  else if(state.contract==='EVENODD'){
+    let e=0,o=0;
+    digits.forEach((n,i)=>i%2?o+=n:e+=n);
+    dir=e>=o?'EVEN':'ODD';
+  } else {
+    const total=digits.reduce((a,b)=>a+b,0)||1;
+    let hi=0;
+    for(let i=1;i<10;i++) if(digits[i]>digits[hi]) hi=i;
+    const current=lastDigit(b,state.pipSize);
+    dir=current===hi?'MATCH':'DIFFER';
+    return {dir,target:hi};
+  }
+  return {dir,target:null};
+}
+
+function scannerBacktest(){
+  if(!state.publicSocket || state.publicSocket.readyState!==1){
+    toast('Connect to Deriv market data first.');
+    return;
+  }
+
+  const oldText=ui.signalText?.textContent||'';
+  if(ui.signalText) ui.signalText.textContent='Backtest: downloading 1,200 ticks…';
+
+  const reqId=Date.now();
+  const handler=(event)=>{
+    let d;
+    try{d=JSON.parse(event.data)}catch{return}
+    if(d.req_id!==reqId || d.msg_type!=='history')return;
+
+    state.publicSocket.removeEventListener('message',handler);
+
+    const prices=(d.history?.prices||[]).map(Number).filter(Number.isFinite);
+    if(prices.length<200){
+      if(ui.signalText)ui.signalText.textContent=oldText;
+      toast('Not enough historical ticks returned.');
+      return;
+    }
+
+    const digitsAll=prices.map(v=>lastDigit(v,state.pipSize));
+    const rows=[];
+    let wins=0,losses=0,waits=0,profit=0,maxLossStreak=0,lossStreak=0;
+
+    // Walk forward. At index i, only prices[0..i] are known.
+    // The next tick i+1 is the simulated 1-tick outcome.
+    for(let i=30;i<prices.length-1;i++){
+      const histDigits=digitsAll.slice(0,i+1).filter(Number.isInteger);
+      const counts=Array(10).fill(0);
+      histDigits.slice(-100).forEach(x=>counts[x]++);
+
+      const signal=scannerBacktestSignal(prices.slice(0,i+1),counts);
+      if(!signal || signal.dir==='WAIT'){
+        waits++;
+        continue;
+      }
+
+      const nextDigit=digitsAll[i+1];
+      if(!Number.isInteger(nextDigit))continue;
+
+      // Rise/Fall is directional rather than digit-based.
+      let win=null;
+      if(signal.dir==='RISE') win=prices[i+1]>prices[i];
+      else if(signal.dir==='FALL') win=prices[i+1]<prices[i];
+      else win=scannerBacktestOutcome(signal.dir,nextDigit,signal.target);
+
+      if(win===null)continue;
+
+      const row={signal:signal.dir,win};
+      rows.push(row);
+
+      if(win){
+        wins++;
+        lossStreak=0;
+        // Conservative demo accounting: 96% profit on a $1 win.
+        profit+=0.96;
+      }else{
+        losses++;
+        lossStreak++;
+        maxLossStreak=Math.max(maxLossStreak,lossStreak);
+        profit-=1;
+      }
+    }
+
+    const total=wins+losses;
+    const rate=total?wins/total*100:0;
+
+    // Breakdown by signal direction.
+    const by={};
+    rows.forEach(r=>{
+      by[r.signal]??={w:0,l:0};
+      r.win?by[r.signal].w++:by[r.signal].l++;
+    });
+
+    const breakdown=Object.entries(by)
+      .map(([k,v])=>{
+        const n=v.w+v.l;
+        return `${k}: ${v.w}/${n} (${n?(v.w/n*100).toFixed(1):'0.0'}%)`;
+      }).join(' • ');
+
+    const msg=
+      `BACKTEST ${total} signals | Win ${wins} | Loss ${losses} | `+
+      `Win rate ${rate.toFixed(1)}% | Max losing streak ${maxLossStreak} | `+
+      `Net demo P/L $${profit.toFixed(2)} | WAIT ${waits}`+
+      (breakdown?` | ${breakdown}`:'');
+
+    if(ui.signalText)ui.signalText.textContent=msg;
+    toast(`Backtest complete: ${rate.toFixed(1)}% win rate`);
+    console.log('[FXTRADE BACKTEST]',{symbol:state.symbol,total,wins,losses,winRate:rate,maxLossStreak,profit,waits,breakdown:by});
+  };
+
+  state.publicSocket.addEventListener('message',handler);
+  state.publicSocket.send(JSON.stringify({
+    ticks_history:state.symbol,
+    count:1200,
+    end:'latest',
+    style:'ticks',
+    subscribe:0,
+    req_id:reqId
+  }));
+}
+
+// Add a Backtest button without requiring an HTML rewrite.
+(function addBacktestButton(){
+  const add=()=>{
+    if($('backtestScanner'))return;
+    const anchor=$('analyze')||$('place');
+    if(!anchor)return;
+    const b=document.createElement('button');
+    b.id='backtestScanner';
+    b.type='button';
+    b.textContent='BACKTEST SCANNER';
+    b.style.cssText='margin-left:8px;padding:7px 10px;border-radius:8px;border:1px solid #777;background:#171717;color:#fff;font-weight:700;font-size:11px;cursor:pointer;';
+    b.onclick=scannerBacktest;
+    anchor.parentNode?.appendChild(b);
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',add);
+  else add();
+})();
+
+if(auth.token){ui.connect.textContent='Connecting…';ui.connect.classList.add('connected')}else{ui.connect.textContent='Connect Deriv';ui.connect.classList.remove('connected')}
+setStake(1);updateLabels();riskUpdate();connectPublic();finishOAuth();
+})();
