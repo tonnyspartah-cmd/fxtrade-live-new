@@ -4,7 +4,7 @@ const $ = id => document.getElementById(id);
 
 const state = {
   ws:null, publicSocket:null, reconnect:null, symbol:'1HZ100V',
-  prices:[], tickDigits:[], digits:Array(10).fill(0), pipSize:null, stake:1, stopLoss:999,
+  prices:[], tickDigits:[], digits:Array(10).fill(0), pipSize:null, digitWindowSize:100, stake:1, stopLoss:999,
   targetProfit:3, sessionNet:0, tradingLocked:false,
   contract:'OVERUNDER', accountType:'demo', balance:10000,
   currency:'USD', authenticated:false, accountId:null,
@@ -20,7 +20,7 @@ const auth={token:sessionStorage.getItem('deriv_access_token')||null};
 
 const ui={
   price:$('price'), digitGrid:$('digitGrid'), balance:$('balance'),
-  direction:$('direction'), confidence:$('confidence'), connection:$('connection'),
+  direction:$('direction'), confidence:$('confidence'), connection:$('headerConnectionText'),
   payout:$('payout'), stake:$('stake'), connect:$('connectDeriv'),
   accountType:$('accountType'), accountLabel:$('accountLabel'), headerConnectionText:$('headerConnectionText'), headerConnectionDot:$('headerConnectionDot'),
   leftLabel:$('leftTradeLabel'), rightLabel:$('rightTradeLabel'),
@@ -51,7 +51,7 @@ function lastDigit(n,pipSize=state.pipSize){
   const m=String(n).replace(/\D/g,'');
   return m?Number(m.at(-1)):null;
 }
-function setConnection(text,ok=false){ui.connection.innerHTML='<i></i>'+text;ui.connection.style.color=ok?'#2ce795':'#ffc857';if(ui.headerConnectionText){ui.headerConnectionText.textContent=ok?'Deriv Connected':(text==='LIVE'?'Market Live':'Not Connected')}if(ui.headerConnectionDot){ui.headerConnectionDot.style.background=ok?'#18f08b':(text==='LIVE'?'#18f08b':'#ffc857')}}
+function setConnection(text,ok=false){if(ui.connection){ui.connection.textContent=ok?'Deriv Connected':(text==='LIVE'?'Market Live':'Not Connected');ui.connection.style.color=ok?'#2ce795':'#ffc857'}if(ui.headerConnectionText){ui.headerConnectionText.textContent=ok?'Deriv Connected':(text==='LIVE'?'Market Live':'Not Connected')}if(ui.headerConnectionDot){ui.headerConnectionDot.style.background=ok?'#18f08b':(text==='LIVE'?'#18f08b':'#ffc857')}}
 function readRisk(){state.stopLoss=Math.max(0,Number($('stopLoss').value)||0);state.targetProfit=Math.max(0,Number($('targetProfit').value)||0);state.multiplier=Math.max(1,Number($('multiplier').value)||1)}
 function updateStopButton(){
   const b=$('stopTrade');
@@ -116,7 +116,7 @@ function updateDigits(){
   const total=state.digits.reduce((a,b)=>a+b,0);if(!total)return;
   const probs=state.digits.map(n=>n/total*100),hi=probs.indexOf(Math.max(...probs));
   const current=state.prices.length?lastDigit(state.prices.at(-1)):null;
-  ui.digitGrid.innerHTML=probs.map((v,i)=>`<div class="digit ${i===hi?'high':''}"><b>${i}</b><small>${v.toFixed(1)}%</small></div>`).join('');
+  ui.digitGrid.innerHTML=probs.map((v,i)=>`<div class="digit ${i===hi?'high':''} ${i===current?'current':''}" data-digit="${i}"><b>${i}</b><small>${v.toFixed(1)}%</small></div>`).join('');
   if(ui.strongestDigit)ui.strongestDigit.textContent=hi;
   if(ui.strongestPct)ui.strongestPct.textContent='('+probs[hi].toFixed(1)+'%)';
   if(ui.digitBig)ui.digitBig.textContent=Number.isInteger(current)?current:'—';
@@ -163,7 +163,7 @@ function onTick(t){
 function subscribePublic(ws){
   ws.send(JSON.stringify({active_symbols:'brief',product_type:'basic',req_id:1}));
   ws.send(JSON.stringify({ticks:state.symbol,subscribe:1,req_id:2}));
-  ws.send(JSON.stringify({ticks_history:state.symbol,count:80,end:'latest',style:'ticks',req_id:3}));
+  ws.send(JSON.stringify({ticks_history:state.symbol,count:100,end:'latest',style:'ticks',req_id:3}));
 }
 function connectPublic(){
   try{state.publicSocket?.close()}catch{}
@@ -171,7 +171,7 @@ function connectPublic(){
   ws.onopen=()=>{opened=true;setConnection('LIVE',true);subscribePublic(ws)};
   ws.onmessage=e=>{try{const d=JSON.parse(e.data);if(d.msg_type==='tick'&&d.tick)onTick(d.tick);if(d.msg_type==='history'&&d.history?.prices){state.pipSize=Number.isInteger(d.history.pip_size)?Number(d.history.pip_size):state.pipSize;
       state.prices=d.history.prices.map(Number).filter(Number.isFinite).slice(-120);
-      state.tickDigits=state.prices.slice(-100).map(v=>lastDigit(v,state.pipSize)).filter(Number.isInteger);
+      state.tickDigits=state.prices.slice(-state.digitWindowSize).map(v=>lastDigit(v,state.pipSize)).filter(Number.isInteger);
       state.digits=Array(10).fill(0);state.tickDigits.forEach(z=>state.digits[z]++);analyze()}if(d.msg_type==='active_symbols'&&Array.isArray(d.active_symbols))populateMarkets(d.active_symbols)}catch{}};
   ws.onerror=()=>{if(!opened)setConnection('CONNECTION ERROR')};
   ws.onclose=()=>{setConnection('RECONNECTING…');clearTimeout(state.reconnect);state.reconnect=setTimeout(connectPublic,3000)};
