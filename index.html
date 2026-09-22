@@ -85,7 +85,10 @@
         <label>Target Profit</label><input id="targetProfit" type="number" min="0" step="0.01" value="3">
         <label>Stop Loss</label><input id="stopLoss" type="number" min="0" step="0.01" value="0">
       </div>
-      <div class="pnl"><span>SESSION</span><strong id="sessionNet">$0.00</strong><small><b id="wins">0</b>W - <b id="losses">0</b>L</small></div>
+      <div class="pnl">
+        <div class="pnl-main"><span>P/L (SESSION)</span><strong id="sessionNet">$0.00</strong></div>
+        <div class="pnl-stats"><span>WINS / LOSSES</span><strong><b id="wins">0</b> - <b id="losses">0</b></strong></div>
+      </div>
     </div>
 
     <div class="trade-side">
@@ -95,7 +98,6 @@
   </section>
 
   <section class="bottom-actions">
-    <button id="place" class="place">Place Demo Trade</button>
     <button id="stopTrade" class="stop">■ STOP</button>
   </section>
 

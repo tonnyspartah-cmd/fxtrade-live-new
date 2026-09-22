@@ -171,12 +171,6 @@ document.querySelectorAll('.contract').forEach(b=>b.onclick=()=>{
 document.querySelectorAll('[data-delta]').forEach(b=>b.onclick=()=>setStake(state.stake+Number(b.dataset.delta)));
 document.querySelectorAll('[data-stake]').forEach(b=>b.onclick=()=>setStake(Number(b.dataset.stake)));
 $('over').onclick=()=>startDemo('left');$('under').onclick=()=>startDemo('right');
-$('place').onclick=()=>{
-  const s=ui.direction.textContent;
-  if(s==='OVER'||s==='RISE'||s==='EVEN')startDemo('left');
-  else if(s==='UNDER'||s==='FALL'||s==='ODD')startDemo('right');
-  else toast('WAIT — no demo trade placed');
-};
 $('stopTrade').onclick=()=>{state.stopped=!state.stopped;$('stopTrade').textContent=state.stopped?'▶ RESUME':'■ STOP';toast(state.stopped?'Trading stopped':'Trading resumed')};
 $('reset').onclick=()=>{state.balance=10000;state.sessionNet=0;state.wins=0;state.losses=0;state.pending=null;state.stopped=false;ui.balance.textContent='$10,000.00';$('sessionNet').textContent='$0.00';$('wins').textContent='0';$('losses').textContent='0';$('stopTrade').textContent='■ STOP';toast('Demo reset')};
 window.addEventListener('resize',drawChart);
