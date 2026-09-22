@@ -4,6 +4,7 @@
 const $ = id => document.getElementById(id);
 const state = {
   ws:null, symbol:'1HZ100V', prices:[], digits:Array(10).fill(0),
+  digitSampleSize:100,
   stake:0.25, contract:'OVERUNDER', balance:10000, sessionNet:0,
   wins:0, losses:0, pending:null, stopped:false, autoSide:null, autoTimer:null, reconnect:null
 };
@@ -18,7 +19,21 @@ const ui={
 
 function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2200)}
 function fmt(n){return Number(n).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}
-function lastDigit(n){const s=String(n);const m=s.replace(/\D/g,'');return m?Number(m.at(-1)):null}
+function lastDigit(n){
+  const q=Number(n);
+  if(!Number.isFinite(q)) return null;
+  // Deriv synthetic-index quotes in this dashboard use 2 decimal places.
+  // Multiplication preserves trailing-zero last digits (e.g. 123.40 -> 0).
+  return Math.floor(Math.abs(q)*100 + 1e-8) % 10;
+}
+
+function rebuildDigitStats(){
+  state.digits=Array(10).fill(0);
+  state.prices.slice(-state.digitSampleSize).forEach(v=>{
+    const d=lastDigit(v);
+    if(d!==null) state.digits[d]++;
+  });
+}
 function setConn(t,ok=false){ui.connection.textContent='● '+t;ui.connection.style.color=ok?'#2ce795':'#ffc857'}
 
 function updateDigits(){
@@ -78,7 +93,8 @@ function drawChart(){
 function onTick(t){
   const q=Number(t.quote);if(!Number.isFinite(q))return;
   state.prices.push(q);if(state.prices.length>120)state.prices.shift();
-  const d=lastDigit(q);if(d!==null)state.digits[d]++;
+  const d=lastDigit(q);
+  rebuildDigitStats();
   ui.price.textContent=fmt(q);
   $('tickCount').textContent=state.prices.length+' ticks';
   updateDigits();updateAnalysis();drawChart();settleDemo(q);
@@ -86,9 +102,8 @@ function onTick(t){
 
 function loadHistory(h){
   if(!h)return;
-  state.prices=h.map(Number).filter(Number.isFinite).slice(-100);
-  state.digits=Array(10).fill(0);
-  state.prices.forEach(v=>{const d=lastDigit(v);if(d!==null)state.digits[d]++});
+  state.prices=h.map(Number).filter(Number.isFinite).slice(-120);
+  rebuildDigitStats();
   updateDigits();updateAnalysis();drawChart();
 }
 
