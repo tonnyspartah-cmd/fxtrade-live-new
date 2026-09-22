@@ -7,7 +7,7 @@ const state = {
   stake:0.25, contract:'OVERUNDER', balance:10000, sessionNet:0,
   wins:0, losses:0, pending:null, stopped:false, reconnect:null
 };
-const feeds=['wss://api.derivws.com/trading/v1/options/ws/public','wss://ws.binaryws.com/websockets/v3'];
+const feeds=['wss://ws.derivws.com/websockets/v3?app_id=1089','wss://ws.binaryws.com/websockets/v3?app_id=1089'];
 
 const ui={
   price:$('price'), digit:$('digitBig'), confidence:$('confidence'),
@@ -26,11 +26,21 @@ function updateDigits(){
   if(!total)return;
   const p=state.digits.map(v=>v/total*100);
   const hot=p.indexOf(Math.max(...p));
-  ui.grid.innerHTML=p.map((v,i)=>`<div class="digit ${i===hot?'hot':''}" data-digit="${i}"><b>${i}</b><small>${v.toFixed(1)}%</small></div>`).join('');
+  const avg=10;
+  ui.grid.innerHTML=p.map((v,i)=>{
+    const level=v>avg+0.5?'green':v<avg-0.5?'red':'neutral';
+    const width=Math.max(3,Math.min(100,v*5));
+    return `<div class="digit ${level} ${i===hot?'hot':''}" data-digit="${i}"><b>${i}</b><div class="digit-bar"><span style="width:${width}%"></span></div><small>${v.toFixed(1)}%</small></div>`;
+  }).join('');
   ui.strongest.textContent=hot;
   ui.strongestPct.textContent='('+p[hot].toFixed(1)+'%)';
   const latest=state.prices.length?lastDigit(state.prices.at(-1)):null;
   ui.digit.textContent=latest===null?'—':latest;
+  ui.digitBig.className='';
+  if(latest!==null){
+    const lp=p[latest]||0;
+    ui.digitBig.classList.add(lp>avg+0.5?'digit-green':lp<avg-0.5?'digit-red':'digit-neutral');
+  }
   moveCursor(latest===null?hot:latest);
 }
 
@@ -97,10 +107,10 @@ function subscribe(ws){
   ws.send(JSON.stringify({ticks_history:state.symbol,count:100,end:'latest',style:'ticks',req_id:3}));
 }
 
-function connect(){
+function connect(feedIndex=0){
   clearTimeout(state.reconnect);
   setConn('Connecting…');
-  const ws=new WebSocket(feeds[0]);state.ws=ws;
+  const ws=new WebSocket(feeds[feedIndex]);state.ws=ws;
   let opened=false;
   ws.onopen=()=>{opened=true;setConn('Live market connected',true);subscribe(ws)};
   ws.onmessage=e=>{
@@ -111,9 +121,12 @@ function connect(){
       if(d.msg_type==='tick'&&d.tick)onTick(d.tick);
     }catch(_){}
   };
-  ws.onerror=()=>setConn('Connection error');
+  ws.onerror=()=>{
+    setConn('Connection error');
+    if(feedIndex<feeds.length-1){try{ws.close()}catch(_){} connect(feedIndex+1)}
+  };
   ws.onclose=()=>{
-    if(opened){setConn('Reconnecting…');state.reconnect=setTimeout(connect,2500)}
+    if(opened){setConn('Reconnecting…');state.reconnect=setTimeout(()=>connect(0),2500)}
   };
 }
 
