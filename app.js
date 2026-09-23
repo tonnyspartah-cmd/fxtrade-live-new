@@ -6,7 +6,8 @@ const state = {
   ws:null, symbol:'1HZ100V', prices:[], digits:Array(10).fill(0),
   digitSampleSize:100,
   stake:0.25, contract:'OVERUNDER', balance:10000, sessionNet:0,
-  wins:0, losses:0, pending:null, stopped:false, autoSide:null, autoTimer:null, reconnect:null
+  wins:0, losses:0, pending:null, stopped:false, autoSide:null, autoTimer:null, reconnect:null,
+  accountMode:'demo', oauthToken:null, accounts:[], account:null, authWs:null, authReconnect:null
 };
 const feeds=['wss://api.derivws.com/trading/v1/options/ws/public','wss://ws.binaryws.com/websockets/v3'];
 
@@ -14,7 +15,8 @@ const ui={
   price:$('price'), digit:$('digitBig'), confidence:$('confidence'),
   direction:$('direction'), grid:$('digitGrid'), strongest:$('strongestDigit'),
   strongestPct:$('strongestPct'), connection:$('connection'), balance:$('balance'),
-  stake:$('stake'), payout:$('payout'), canvas:$('chartCanvas')
+  stake:$('stake'), payout:$('payout'), canvas:$('chartCanvas'),
+  accountLabel:$('accountLabel'), derivStatus:$('derivStatus'), derivAccount:$('derivAccount')
 };
 
 function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2200)}
@@ -132,6 +134,100 @@ function connect(){
   };
 }
 
+const DERIV_API='https://api.derivws.com';
+const DERIV_CLIENT_ID=window.FXTRADE_DERIV_CLIENT_ID || localStorage.getItem('fxtrade_deriv_client_id') || '';
+const OAUTH_SCOPE='trade';
+
+function base64url(bytes){return btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}
+function randomString(n=64){const a=new Uint8Array(n);crypto.getRandomValues(a);return base64url(a)}
+async function sha256(s){return crypto.subtle.digest('SHA-256',new TextEncoder().encode(s))}
+
+async function connectDeriv(){
+  let clientId=window.FXTRADE_DERIV_CLIENT_ID || localStorage.getItem('fxtrade_deriv_client_id') || '';
+  if(!clientId){
+    clientId=prompt('Enter your Deriv OAuth Client ID from developers.deriv.com:','');
+    if(!clientId)return;
+    localStorage.setItem('fxtrade_deriv_client_id',clientId.trim());
+  }
+  const verifier=randomString(64), challenge=base64url(await sha256(verifier)), state=randomString(24);
+  sessionStorage.setItem('fxtrade_pkce_verifier',verifier);
+  sessionStorage.setItem('fxtrade_oauth_state',state);
+  sessionStorage.setItem('fxtrade_client_id',clientId.trim());
+  sessionStorage.setItem('fxtrade_return_mode',state.accountMode || 'demo');
+  const redirect=location.origin+'/';
+  const url=new URL('https://auth.deriv.com/oauth2/auth');
+  url.searchParams.set('response_type','code');url.searchParams.set('client_id',clientId.trim());
+  url.searchParams.set('redirect_uri',redirect);url.searchParams.set('scope',OAUTH_SCOPE);
+  url.searchParams.set('state',state);url.searchParams.set('code_challenge',challenge);url.searchParams.set('code_challenge_method','S256');
+  location.href=url.toString();
+}
+
+async function handleOAuthCallback(){
+  const qs=new URLSearchParams(location.search), code=qs.get('code'), returnedState=qs.get('state'), error=qs.get('error');
+  if(error){toast('Deriv login cancelled');history.replaceState({},'',location.pathname);return}
+  if(!code)return;
+  const savedState=sessionStorage.getItem('fxtrade_oauth_state'), verifier=sessionStorage.getItem('fxtrade_pkce_verifier'), clientId=sessionStorage.getItem('fxtrade_client_id');
+  if(!savedState || returnedState!==savedState || !verifier || !clientId){toast('Deriv login security check failed');return}
+  try{
+    ui.derivStatus.textContent='Authorizing…';
+    const r=await fetch('/api/oauth/token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,code_verifier:verifier,redirect_uri:location.origin+'/',client_id:clientId})});
+    const data=await r.json(); if(!r.ok || !data.access_token) throw new Error(data.error||'Token exchange failed');
+    state.oauthToken=data.access_token;
+    sessionStorage.setItem('fxtrade_access_token',data.access_token);
+    sessionStorage.removeItem('fxtrade_oauth_state');sessionStorage.removeItem('fxtrade_pkce_verifier');
+    history.replaceState({},'',location.pathname);
+    await loadDerivAccounts();
+    toast('Deriv connected');
+  }catch(e){ui.derivStatus.textContent='Connection failed';toast(e.message||'Deriv connection failed')}
+}
+
+async function derivFetch(path, options={}){
+  if(!state.oauthToken)throw new Error('Connect your Deriv account first');
+  const r=await fetch('/api/deriv/proxy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path,method:options.method||'GET',body:options.body||null,token:state.oauthToken})});
+  const data=await r.json();if(!r.ok)throw new Error(data?.errors?.[0]?.message||data?.error||'Deriv request failed');return data;
+}
+
+async function loadDerivAccounts(){
+  try{
+    const data=await derivFetch('/trading/v1/options/accounts');
+    const raw=Array.isArray(data.data)?data.data:(data.data?[data.data]:[]);
+    state.accounts=raw;
+    ui.derivAccount.innerHTML=raw.length?raw.map(a=>`<option value="${a.account_id}">${a.account_type==='real'?'REAL':'DEMO'} — ${a.account_id} — ${a.currency} ${fmt(a.balance)}</option>`).join(''):'<option value="">No Options accounts found</option>';
+    const preferred=raw.find(a=>a.account_type===state.accountMode) || raw[0];
+    if(preferred){ui.derivAccount.value=preferred.account_id;await selectDerivAccount(preferred.account_id)}
+    ui.derivStatus.textContent='Connected';
+  }catch(e){ui.derivStatus.textContent='Unable to load accounts';toast(e.message)}
+}
+
+async function selectDerivAccount(id){
+  const a=state.accounts.find(x=>x.account_id===id);if(!a)return;
+  state.account=a;state.accountMode=a.account_type;
+  ui.accountLabel.textContent=a.account_type==='real'?'Real Account':'Demo Account';
+  ui.balance.textContent=(a.currency==='USD'?'$':a.currency+' ')+fmt(a.balance);
+  document.querySelectorAll('.mode').forEach(x=>x.classList.toggle('active',x.id===(a.account_type==='real'?'realMode':'demoMode')));
+  if(state.authWs)try{state.authWs.close()}catch(_){}
+  try{
+    const otp=await derivFetch(`/trading/v1/options/accounts/${encodeURIComponent(id)}/otp`,{method:'POST'});
+    const url=otp?.data?.url;if(!url)throw new Error('Deriv did not return a WebSocket URL');
+    state.authWs=new WebSocket(url);
+    state.authWs.onopen=()=>{ui.derivStatus.textContent='Connected · '+(a.account_type==='real'?'REAL':'DEMO');state.authWs.send(JSON.stringify({balance:1,subscribe:1,req_id:41}))};
+    state.authWs.onmessage=e=>{try{const d=JSON.parse(e.data);if(d.error){toast(d.error.message||'Deriv account error');return}if(d.msg_type==='balance'&&d.balance){const n=Number(d.balance.balance);if(Number.isFinite(n))ui.balance.textContent=(d.balance.currency==='USD'?'$':d.balance.currency+' ')+fmt(n)}}catch(_) {}};
+    state.authWs.onclose=()=>{ui.derivStatus.textContent='Disconnected';};
+  }catch(e){toast(e.message)}
+}
+
+function setAccountMode(mode){
+  state.accountMode=mode;
+  document.querySelectorAll('.mode').forEach(x=>x.classList.toggle('active',x.id===(mode==='real'?'realMode':'demoMode')));
+  $('realPanel').classList.toggle('hidden',mode!=='real');
+  if(mode==='real'){
+    state.autoSide=null;clearTimeout(state.autoTimer);
+    if(state.oauthToken){loadDerivAccounts()}else{ui.derivStatus.textContent='Not connected';toast('Connect Deriv to use the real account')}
+  }else{
+    ui.accountLabel.textContent='Demo Account';ui.balance.textContent='$'+fmt(state.balance);
+  }
+}
+
 function setStake(v){
   state.stake=Math.max(.25,Math.min(100,Math.round(v*100)/100));
   ui.stake.textContent=state.stake.toFixed(2);
@@ -145,6 +241,7 @@ function updateLabels(){
 }
 
 function startDemo(side){
+  if(state.accountMode==='real'){ toast('Real account selected. Connect Deriv first; live-money order execution is disabled until the account is authenticated.'); return; }
   if(state.stopped){toast('Trading is stopped. Press STOP again to resume.');return}
   if(state.pending){toast('Wait for the current demo trade to settle.');return}
   if(state.balance<state.stake){toast('Demo balance is too low.');return}
@@ -183,6 +280,12 @@ function checkLimits(){
   $('stopTrade').textContent=state.stopped?'▶ RESUME':'■ STOP';
 }
 
+$('connectDeriv').onclick=connectDeriv;
+$('demoMode').onclick=()=>setAccountMode('demo');
+$('realMode').onclick=()=>setAccountMode('real');
+$('refreshAccounts').onclick=()=>state.oauthToken?loadDerivAccounts():toast('Connect Deriv first');
+ui.derivAccount.onchange=e=>selectDerivAccount(e.target.value);
+
 $('market').onchange=e=>{state.symbol=e.target.value;state.prices=[];state.digits=Array(10).fill(0);try{state.ws.close()}catch(_){}connect()};
 document.querySelectorAll('.contract').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('.contract').forEach(x=>x.classList.remove('active'));b.classList.add('active');
@@ -199,5 +302,8 @@ $('stopTrade').onclick=()=>{
 };
 $('reset').onclick=()=>{clearTimeout(state.autoTimer);state.autoTimer=null;state.autoSide=null;state.balance=10000;state.sessionNet=0;state.wins=0;state.losses=0;state.pending=null;state.stopped=false;ui.balance.textContent='$10,000.00';$('sessionNet').textContent='$0.00';$('wins').textContent='0';$('losses').textContent='0';$('stopTrade').textContent='■ STOP';toast('Demo reset')};
 window.addEventListener('resize',drawChart);
-setStake(.25);updateLabels();connect();
+setStake(.25);updateLabels();setAccountMode('demo');
+state.oauthToken=sessionStorage.getItem('fxtrade_access_token')||null;
+if(state.oauthToken){ui.derivStatus.textContent='Connected';loadDerivAccounts()}
+handleOAuthCallback();connect();
 })();

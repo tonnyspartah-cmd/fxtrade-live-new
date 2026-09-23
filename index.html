@@ -17,8 +17,21 @@
   </header>
 
   <section class="account">
-    <div class="account-left"><div class="wallet">▣</div><div><small>Demo Account</small><strong id="balance">$10,000.00</strong></div></div>
-    <button id="reset" class="reset">↻ Reset</button>
+    <div class="account-left"><div class="wallet">▣</div><div><small id="accountLabel">Demo Account</small><strong id="balance">$10,000.00</strong></div></div>
+    <div class="account-actions">
+      <div class="account-switch" role="group" aria-label="Account mode">
+        <button id="demoMode" class="mode active">DEMO</button>
+        <button id="realMode" class="mode">REAL</button>
+      </div>
+      <button id="connectDeriv" class="connect-btn">Connect Deriv</button>
+      <button id="reset" class="reset">↻ Reset</button>
+    </div>
+  </section>
+  <section id="realPanel" class="real-panel hidden">
+    <div><b>Deriv connection</b><span id="derivStatus">Not connected</span></div>
+    <label>Account <select id="derivAccount"><option value="">Connect to load accounts</option></select></label>
+    <button id="refreshAccounts" class="small-btn">Refresh</button>
+    <p>Real mode uses your Deriv account and balance. No Deriv password or API token is stored in this page.</p>
   </section>
 
   <section class="selectors">
