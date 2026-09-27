@@ -92,6 +92,35 @@ function drawChart(){
   ctx.strokeStyle='#19a9ff';ctx.lineWidth=2;ctx.stroke();
 }
 
+function updateLivePnlFromTick(d){
+  // Keep the P/L display moving with the same live tick stream as the
+  // prediction digit. This is a live *estimate* while the contract is open;
+  // the settled value is always replaced by Deriv's actual profit at expiry.
+  if(!state.pending || state.pending.phase!=='open') return;
+  const stake=Number(state.pending.stake)||0;
+  if(!stake) return;
+  const side=state.pending.side;
+  let favorable=false;
+  if(state.contract==='OVERUNDER'){
+    favorable=side==='left' ? d>=4 : d<=3;
+  }else if(state.contract==='EVENODD'){
+    const even=d%2===0;
+    favorable=side==='left' ? even : !even;
+  }else if(state.contract==='RISEFALL'){
+    const prev=state.prices.length>1 ? state.prices.at(-2) : null;
+    const cur=state.prices.at(-1);
+    if(prev!==null) favorable=side==='left' ? cur>prev : cur<prev;
+  }
+  // Smoothly show an indicative value on every tick without changing the
+  // actual account/session P/L. The final value comes from Deriv.
+  // Keep the cumulative session P/L visible while adding the current
+  // contract's live tick-by-tick estimate. This makes the number move
+  // with the prediction digit instead of waiting for settlement.
+  const estimate=favorable ? stake*0.20 : -stake*0.20;
+  const liveTotal=state.sessionNet+estimate;
+  $('sessionNet').textContent=(liveTotal>=0?'+$':'-$')+Math.abs(liveTotal).toFixed(2);
+}
+
 function onTick(t){
   const q=Number(t.quote);if(!Number.isFinite(q))return;
   state.prices.push(q);if(state.prices.length>120)state.prices.shift();
@@ -100,6 +129,7 @@ function onTick(t){
   ui.price.textContent=fmt(q);
   $('tickCount').textContent=state.prices.length+' ticks';
   updateDigits();updateAnalysis();drawChart();
+  updateLivePnlFromTick(d);
 }
 
 function loadHistory(h){
@@ -341,8 +371,11 @@ function handleDerivTradeMessage(d){
   if(d.msg_type==='proposal_open_contract' && state.pending && Number(d.proposal_open_contract?.contract_id)===Number(state.pending.contractId)){
     const c=d.proposal_open_contract;
     const profit=Number(c.profit);
-    if(Number.isFinite(profit)){
-      $('sessionNet').textContent=(profit>=0?'+$':'-$')+Math.abs(profit).toFixed(2);
+    if(Number.isFinite(profit) && state.pending.phase==='open'){
+      // Deriv's live contract profit is authoritative when available.
+      // The public tick handler also refreshes the display every tick.
+      const liveTotal=state.sessionNet+profit;
+      $('sessionNet').textContent=(liveTotal>=0?'+$':'-$')+Math.abs(liveTotal).toFixed(2);
     }
     // Only settle the session statistics once Deriv reports the contract closed.
     if(c.is_sold || c.status==='won' || c.status==='lost' || c.status==='sold'){
