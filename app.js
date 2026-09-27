@@ -374,7 +374,7 @@ function handleDerivTradeMessage(d){
       state.pending=null;
       if(!state.stopped && state.autoSide){
         clearTimeout(state.autoTimer);
-        state.autoTimer=setTimeout(()=>startDerivTrade(state.autoSide),250);
+        state.autoTimer=setTimeout(()=>startDerivTrade(state.autoSide),0);
       }
     }
   }
