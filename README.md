@@ -33,3 +33,7 @@ This build adds Demo/Real account mode and Deriv OAuth 2.0 account connection. D
 2. Register the exact Vercel URL as the OAuth redirect URI (this app uses `https://YOUR-DOMAIN/`).
 3. The first time Connect Deriv is pressed, enter the Deriv OAuth Client ID. It is stored locally in the browser.
 4. Do not put a Deriv client secret or personal access token in `index.html` or `app.js`.
+
+
+## Trading connection update
+The dashboard now routes Demo and Real trades through the authenticated Deriv Options WebSocket. It requests a Deriv proposal, buys the returned proposal, and monitors the contract until settlement. The balance shown after connection is the selected Deriv account balance.

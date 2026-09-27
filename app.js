@@ -7,7 +7,7 @@ const state = {
   digitSampleSize:100,
   stake:0.25, contract:'OVERUNDER', balance:10000, sessionNet:0,
   wins:0, losses:0, pending:null, stopped:false, autoSide:null, autoTimer:null, reconnect:null,
-  accountMode:'demo', oauthToken:null, accounts:[], account:null, authWs:null, authReconnect:null
+  accountMode:'demo', oauthToken:null, accounts:[], account:null, authWs:null, authReconnect:null, tradeReqId:1000
 };
 const feeds=['wss://api.derivws.com/trading/v1/options/ws/public','wss://ws.binaryws.com/websockets/v3'];
 
@@ -99,7 +99,7 @@ function onTick(t){
   rebuildDigitStats();
   ui.price.textContent=fmt(q);
   $('tickCount').textContent=state.prices.length+' ticks';
-  updateDigits();updateAnalysis();drawChart();settleDemo(q);
+  updateDigits();updateAnalysis();drawChart();
 }
 
 function loadHistory(h){
@@ -211,7 +211,19 @@ async function selectDerivAccount(id){
     const url=otp?.data?.url;if(!url)throw new Error('Deriv did not return a WebSocket URL');
     state.authWs=new WebSocket(url);
     state.authWs.onopen=()=>{ui.derivStatus.textContent='Connected · '+(a.account_type==='real'?'REAL':'DEMO');state.authWs.send(JSON.stringify({balance:1,subscribe:1,req_id:41}))};
-    state.authWs.onmessage=e=>{try{const d=JSON.parse(e.data);if(d.error){toast(d.error.message||'Deriv account error');return}if(d.msg_type==='balance'&&d.balance){const n=Number(d.balance.balance);if(Number.isFinite(n))ui.balance.textContent=(d.balance.currency==='USD'?'$':d.balance.currency+' ')+fmt(n)}}catch(_) {}};
+    state.authWs.onmessage=e=>{try{
+      const d=JSON.parse(e.data);
+      if(d.error){
+        handleDerivTradeMessage(d);
+        if(!state.pending)toast(d.error.message||'Deriv account error');
+        return;
+      }
+      if(d.msg_type==='balance'&&d.balance){
+        const n=Number(d.balance.balance);
+        if(Number.isFinite(n))ui.balance.textContent=(d.balance.currency==='USD'?'$':d.balance.currency+' ')+fmt(n);
+      }
+      handleDerivTradeMessage(d);
+    }catch(_) {}};
     state.authWs.onclose=()=>{ui.derivStatus.textContent='Disconnected';};
   }catch(e){toast(e.message)}
 }
@@ -224,7 +236,8 @@ function setAccountMode(mode){
     state.autoSide=null;clearTimeout(state.autoTimer);
     if(state.oauthToken){loadDerivAccounts()}else{ui.derivStatus.textContent='Not connected';toast('Connect Deriv to use the real account')}
   }else{
-    ui.accountLabel.textContent='Demo Account';ui.balance.textContent='$'+fmt(state.balance);
+    if(state.oauthToken) loadDerivAccounts();
+    else { ui.accountLabel.textContent='Demo Account'; ui.balance.textContent='Connect Deriv'; }
   }
 }
 
@@ -241,35 +254,114 @@ function updateLabels(){
 }
 
 function startDemo(side){
-  if(state.accountMode==='real'){ toast('Real account selected. Connect Deriv first; live-money order execution is disabled until the account is authenticated.'); return; }
-  if(state.stopped){toast('Trading is stopped. Press STOP again to resume.');return}
-  if(state.pending){toast('Wait for the current demo trade to settle.');return}
-  if(state.balance<state.stake){toast('Demo balance is too low.');return}
-  state.balance-=state.stake;
-  state.pending={side,entry:state.prices.at(-1),stake:state.stake,contract:state.contract};
-  if(state.autoSide===null) state.autoSide=side;
-  ui.balance.textContent='$'+fmt(state.balance);
-  toast('Demo '+(side==='left'?$('leftTradeLabel').textContent:$('rightTradeLabel').textContent)+' placed');
+  // Trading now uses the authenticated Deriv Options WebSocket for BOTH demo and real
+  // accounts, so the displayed balance and completed-trade P/L come from Deriv.
+  startDerivTrade(side);
 }
 
-function settleDemo(price){
-  const t=state.pending;if(!t)return;
-  const d=lastDigit(price);let win=false;
-  if(t.contract==='OVERUNDER')win=t.side==='left'?d>=4:d<=3;
-  else if(t.contract==='EVENODD')win=t.side==='left'?d%2===0:d%2===1;
-  else win=t.side==='left'?price>t.entry:price<t.entry;
-  state.pending=null;
-  if(win){
-    const payout=t.stake*1.95;state.balance+=payout;state.sessionNet+=payout-t.stake;state.wins++;
-    toast('Demo WIN +$'+(payout-t.stake).toFixed(2));
-  }else{state.sessionNet-=t.stake;state.losses++;toast('Demo LOSS -$'+t.stake.toFixed(2))}
-  ui.balance.textContent='$'+fmt(state.balance);
-  $('sessionNet').textContent=(state.sessionNet>=0?'+$':'-$')+Math.abs(state.sessionNet).toFixed(2);
-  $('wins').textContent=state.wins;$('losses').textContent=state.losses;
-  checkLimits();
-  if(!state.stopped && state.autoSide && !state.pending){
-    clearTimeout(state.autoTimer);
-    state.autoTimer=setTimeout(()=>startDemo(state.autoSide),250);
+function startDerivTrade(side){
+  if(!state.account || !state.authWs || state.authWs.readyState!==WebSocket.OPEN){
+    toast('Connect Deriv and select a Demo or Real account first.');
+    return;
+  }
+  if(state.stopped){toast('Trading is stopped. Press STOP again to resume.');return}
+  if(state.pending){toast('Wait for the current trade to settle.');return}
+
+  const stake=Number(state.stake);
+  if(!Number.isFinite(stake)||stake<=0){toast('Invalid stake.');return}
+
+  const currency=state.account.currency || 'USD';
+  let contract_type, barrier;
+  if(state.contract==='OVERUNDER'){
+    contract_type=side==='left'?'DIGITOVER':'DIGITUNDER';
+    barrier=side==='left'?'3':'4';
+  }else if(state.contract==='EVENODD'){
+    contract_type=side==='left'?'DIGITEVEN':'DIGITODD';
+  }else{
+    contract_type=side==='left'?'CALL':'PUT';
+  }
+
+  const reqId=++state.tradeReqId;
+  state.pending={phase:'proposal',side,stake,reqId,contract_type};
+  state.authWs.send(JSON.stringify({
+    proposal:1,
+    amount:stake,
+    basis:'stake',
+    contract_type,
+    currency,
+    duration:1,
+    duration_unit:'t',
+    underlying_symbol:state.symbol,
+    ...(barrier!==undefined?{barrier}:{}),
+    req_id:reqId
+  }));
+  toast((state.account.account_type==='real'?'REAL ':'DEMO ')+
+        (side==='left'?$('leftTradeLabel').textContent:$('rightTradeLabel').textContent)+' proposal requested');
+}
+
+function handleDerivTradeMessage(d){
+  if(d.error){
+    if(state.pending){
+      state.pending=null;
+      toast('Trade rejected: '+(d.error.message||'Deriv error'));
+    }
+    return;
+  }
+
+  if(d.msg_type==='proposal' && state.pending && d.req_id===state.pending.reqId){
+    const p=d.proposal;
+    const price=Number(p?.ask_price);
+    if(!p?.id || !Number.isFinite(price)){
+      state.pending=null;toast('Deriv returned an invalid proposal.');return;
+    }
+    const buyReq=++state.tradeReqId;
+    state.pending={...state.pending,phase:'buying',proposalId:p.id,askPrice:price,buyReq};
+    state.authWs.send(JSON.stringify({
+      buy:String(p.id),
+      price,
+      req_id:buyReq
+    }));
+    return;
+  }
+
+  if(d.msg_type==='buy' && state.pending && d.req_id===state.pending.buyReq){
+    const contractId=d.buy?.contract_id;
+    if(!contractId){state.pending=null;toast('Deriv did not return a contract ID.');return;}
+    state.pending={...state.pending,phase:'open',contractId};
+    state.authWs.send(JSON.stringify({
+      proposal_open_contract:1,
+      contract_id:contractId,
+      subscribe:1,
+      req_id:++state.tradeReqId
+    }));
+    toast('Trade placed on Deriv');
+    return;
+  }
+
+  if(d.msg_type==='proposal_open_contract' && state.pending && Number(d.proposal_open_contract?.contract_id)===Number(state.pending.contractId)){
+    const c=d.proposal_open_contract;
+    const profit=Number(c.profit);
+    if(Number.isFinite(profit)){
+      $('sessionNet').textContent=(profit>=0?'+$':'-$')+Math.abs(profit).toFixed(2);
+    }
+    // Only settle the session statistics once Deriv reports the contract closed.
+    if(c.is_sold || c.status==='won' || c.status==='lost' || c.status==='sold'){
+      const finalProfit=Number(c.profit);
+      if(Number.isFinite(finalProfit)){
+        state.sessionNet+=finalProfit;
+        if(finalProfit>=0){state.wins++;toast('Deriv WIN +$'+finalProfit.toFixed(2));}
+        else {state.losses++;toast('Deriv LOSS -$'+Math.abs(finalProfit).toFixed(2));}
+        $('sessionNet').textContent=(state.sessionNet>=0?'+$':'-$')+Math.abs(state.sessionNet).toFixed(2);
+        $('wins').textContent=state.wins;
+        $('losses').textContent=state.losses;
+        checkLimits();
+      }
+      state.pending=null;
+      if(!state.stopped && state.autoSide){
+        clearTimeout(state.autoTimer);
+        state.autoTimer=setTimeout(()=>startDerivTrade(state.autoSide),250);
+      }
+    }
   }
 }
 
