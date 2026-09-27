@@ -93,31 +93,12 @@ function drawChart(){
 }
 
 function updateLivePnlFromTick(d){
-  // Keep the P/L display moving with the same live tick stream as the
-  // prediction digit. This is a live *estimate* while the contract is open;
-  // the settled value is always replaced by Deriv's actual profit at expiry.
+  // Refresh the P/L display on every public tick, at the same UI cadence as
+  // the prediction digit. The value is the latest live profit reported by Deriv.
   if(!state.pending || state.pending.phase!=='open') return;
-  const stake=Number(state.pending.stake)||0;
-  if(!stake) return;
-  const side=state.pending.side;
-  let favorable=false;
-  if(state.contract==='OVERUNDER'){
-    favorable=side==='left' ? d>=4 : d<=3;
-  }else if(state.contract==='EVENODD'){
-    const even=d%2===0;
-    favorable=side==='left' ? even : !even;
-  }else if(state.contract==='RISEFALL'){
-    const prev=state.prices.length>1 ? state.prices.at(-2) : null;
-    const cur=state.prices.at(-1);
-    if(prev!==null) favorable=side==='left' ? cur>prev : cur<prev;
-  }
-  // Smoothly show an indicative value on every tick without changing the
-  // actual account/session P/L. The final value comes from Deriv.
-  // Keep the cumulative session P/L visible while adding the current
-  // contract's live tick-by-tick estimate. This makes the number move
-  // with the prediction digit instead of waiting for settlement.
-  const estimate=favorable ? stake*0.20 : -stake*0.20;
-  const liveTotal=state.sessionNet+estimate;
+  const liveProfit=Number(state.pending.liveProfit);
+  if(!Number.isFinite(liveProfit)) return;
+  const liveTotal=state.sessionNet+liveProfit;
   $('sessionNet').textContent=(liveTotal>=0?'+$':'-$')+Math.abs(liveTotal).toFixed(2);
 }
 
@@ -372,8 +353,9 @@ function handleDerivTradeMessage(d){
     const c=d.proposal_open_contract;
     const profit=Number(c.profit);
     if(Number.isFinite(profit) && state.pending.phase==='open'){
-      // Deriv's live contract profit is authoritative when available.
-      // The public tick handler also refreshes the display every tick.
+      // Cache Deriv's latest live contract profit. The public tick handler
+      // refreshes the display at the same cadence as the prediction digit.
+      state.pending.liveProfit=profit;
       const liveTotal=state.sessionNet+profit;
       $('sessionNet').textContent=(liveTotal>=0?'+$':'-$')+Math.abs(liveTotal).toFixed(2);
     }
