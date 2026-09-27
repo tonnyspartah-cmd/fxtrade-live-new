@@ -8,7 +8,7 @@ const state = {
   stake:0.25, contract:'OVERUNDER', balance:10000, sessionNet:0,
   wins:0, losses:0, pending:null, stopped:false, autoSide:null, autoTimer:null, reconnect:null,
   accountMode:'demo', oauthToken:null, accounts:[], account:null, authWs:null, authReconnect:null, tradeReqId:1000,
-  practicePayout:0.95, practiceLastTick:0, tickSeq:0
+  practicePayout:0.95, practiceLastTick:0, tickSeq:0, realLastTick:0, realTradesInWindow:0, realWindowStart:0, realOpen:new Map()
 };
 const feeds=['wss://api.derivws.com/trading/v1/options/ws/public','wss://ws.binaryws.com/websockets/v3'];
 
@@ -94,8 +94,19 @@ function drawChart(){
 }
 
 function updateLivePnlFromTick(d){
-  // Refresh the P/L display on every public tick, at the same UI cadence as
-  // the prediction digit. The value is the latest live profit reported by Deriv.
+  // In REAL mode, display the session result plus the combined live profit
+  // reported by currently open Deriv contracts. In DEMO mode this is unused
+  // because practice P/L is settled directly on each tick.
+  if(state.accountMode==='real' && state.realOpen.size){
+    let live=0;
+    for(const t of state.realOpen.values()){
+      const p=Number(t.liveProfit);
+      if(Number.isFinite(p)) live+=p;
+    }
+    const total=state.sessionNet+live;
+    $('sessionNet').textContent=(total>=0?'+$':'-$')+Math.abs(total).toFixed(2);
+    return;
+  }
   if(!state.pending || state.pending.phase!=='open') return;
   const liveProfit=Number(state.pending.liveProfit);
   if(!Number.isFinite(liveProfit)) return;
@@ -114,6 +125,7 @@ function onTick(t){
   updateDigits();updateAnalysis();drawChart();
   updateLivePnlFromTick(d);
   runPracticeTradeOnTick(d);
+  runRealTradeOnTick(d);
 }
 
 function loadHistory(h){
@@ -308,13 +320,26 @@ function runPracticeTradeOnTick(d){
   checkLimits();
 }
 
+function runRealTradeOnTick(d){
+  if(state.accountMode!=='real' || !state.autoSide || state.stopped || d===null) return;
+  if(state.realLastTick===state.tickSeq) return;
+  state.realLastTick=state.tickSeq;
+  if(!state.account || !state.authWs || state.authWs.readyState!==WebSocket.OPEN) return;
+  const now=Date.now();
+  if(now-state.realWindowStart>=1000){state.realWindowStart=now;state.realTradesInWindow=0;}
+  // Keep a conservative ceiling below Deriv's shared proposal/buy/open-contract budget.
+  if(state.realTradesInWindow>=3) return;
+  state.realTradesInWindow++;
+  startDerivTrade(state.autoSide);
+}
+
 function startDerivTrade(side){
   if(!state.account || !state.authWs || state.authWs.readyState!==WebSocket.OPEN){
     toast('Connect Deriv and select a Demo or Real account first.');
     return;
   }
   if(state.stopped){toast('Trading is stopped. Press STOP again to resume.');return}
-  if(state.pending){toast('Wait for the current trade to settle.');return}
+  if(state.accountMode!=='real' && state.pending){toast('Wait for the current trade to settle.');return}
 
   const stake=Number(state.stake);
   if(!Number.isFinite(stake)||stake<=0){toast('Invalid stake.');return}
@@ -331,7 +356,9 @@ function startDerivTrade(side){
   }
 
   const reqId=++state.tradeReqId;
-  state.pending={phase:'proposal',side,stake,reqId,contract_type};
+  const tradeState={phase:'proposal',side,stake,reqId,contract_type};
+  if(state.accountMode==='real') state.realOpen.set(reqId,tradeState);
+  else state.pending=tradeState;
   state.authWs.send(JSON.stringify({
     proposal:1,
     amount:stake,
@@ -350,54 +377,62 @@ function startDerivTrade(side){
 
 function handleDerivTradeMessage(d){
   if(d.error){
-    if(state.pending){
-      state.pending=null;
+    const reqId=d.req_id;
+    const trade=(state.accountMode==='real' && reqId && state.realOpen.get(reqId)) || state.pending;
+    if(trade){
+      if(state.accountMode==='real' && reqId) state.realOpen.delete(reqId);
+      else state.pending=null;
       toast('Trade rejected: '+(d.error.message||'Deriv error'));
     }
     return;
   }
 
-  if(d.msg_type==='proposal' && state.pending && d.req_id===state.pending.reqId){
-    const p=d.proposal;
-    const price=Number(p?.ask_price);
+  if(d.msg_type==='proposal'){
+    const trade=(state.accountMode==='real' ? state.realOpen.get(d.req_id) : state.pending);
+    if(!trade || d.req_id!==trade.reqId)return;
+    const p=d.proposal, price=Number(p?.ask_price);
     if(!p?.id || !Number.isFinite(price)){
-      state.pending=null;toast('Deriv returned an invalid proposal.');return;
+      if(state.accountMode==='real') state.realOpen.delete(d.req_id); else state.pending=null;
+      toast('Deriv returned an invalid proposal.');return;
     }
     const buyReq=++state.tradeReqId;
-    state.pending={...state.pending,phase:'buying',proposalId:p.id,askPrice:price,buyReq};
-    state.authWs.send(JSON.stringify({
-      buy:String(p.id),
-      price,
-      req_id:buyReq
-    }));
+    const updated={...trade,phase:'buying',proposalId:p.id,askPrice:price,buyReq};
+    if(state.accountMode==='real') state.realOpen.set(trade.reqId,updated); else state.pending=updated;
+    state.authWs.send(JSON.stringify({buy:String(p.id),price,req_id:buyReq}));
     return;
   }
 
-  if(d.msg_type==='buy' && state.pending && d.req_id===state.pending.buyReq){
+  if(d.msg_type==='buy'){
+    const trade=state.accountMode==='real'
+      ? [...state.realOpen.values()].find(x=>x.buyReq===d.req_id)
+      : state.pending;
+    if(!trade || d.req_id!==trade.buyReq)return;
     const contractId=d.buy?.contract_id;
-    if(!contractId){state.pending=null;toast('Deriv did not return a contract ID.');return;}
-    state.pending={...state.pending,phase:'open',contractId};
-    state.authWs.send(JSON.stringify({
-      proposal_open_contract:1,
-      contract_id:contractId,
-      subscribe:1,
-      req_id:++state.tradeReqId
-    }));
+    if(!contractId){
+      if(state.accountMode==='real') state.realOpen.delete(trade.reqId); else state.pending=null;
+      toast('Deriv did not return a contract ID.');return;
+    }
+    const updated={...trade,phase:'open',contractId};
+    if(state.accountMode==='real') state.realOpen.set(trade.reqId,updated); else state.pending=updated;
+    state.authWs.send(JSON.stringify({proposal_open_contract:1,contract_id:contractId,subscribe:1,req_id:++state.tradeReqId}));
     toast('Trade placed on Deriv');
     return;
   }
 
-  if(d.msg_type==='proposal_open_contract' && state.pending && Number(d.proposal_open_contract?.contract_id)===Number(state.pending.contractId)){
-    const c=d.proposal_open_contract;
-    const profit=Number(c.profit);
-    if(Number.isFinite(profit) && state.pending.phase==='open'){
-      // Cache Deriv's latest live contract profit. The public tick handler
-      // refreshes the display at the same cadence as the prediction digit.
-      state.pending.liveProfit=profit;
-      const liveTotal=state.sessionNet+profit;
-      $('sessionNet').textContent=(liveTotal>=0?'+$':'-$')+Math.abs(liveTotal).toFixed(2);
+  if(d.msg_type==='proposal_open_contract'){
+    const cid=Number(d.proposal_open_contract?.contract_id);
+    const trade=state.accountMode==='real'
+      ? [...state.realOpen.values()].find(x=>Number(x.contractId)===cid)
+      : (state.pending && Number(state.pending.contractId)===cid ? state.pending : null);
+    if(!trade)return;
+    const c=d.proposal_open_contract, profit=Number(c.profit);
+    if(Number.isFinite(profit) && trade.phase==='open'){
+      trade.liveProfit=profit;
+      if(state.accountMode==='demo'){
+        const liveTotal=state.sessionNet+profit;
+        $('sessionNet').textContent=(liveTotal>=0?'+$':'-$')+Math.abs(liveTotal).toFixed(2);
+      }
     }
-    // Only settle the session statistics once Deriv reports the contract closed.
     if(c.is_sold || c.status==='won' || c.status==='lost' || c.status==='sold'){
       const finalProfit=Number(c.profit);
       if(Number.isFinite(finalProfit)){
@@ -405,19 +440,17 @@ function handleDerivTradeMessage(d){
         if(finalProfit>=0){state.wins++;toast('Deriv WIN +$'+finalProfit.toFixed(2));}
         else {state.losses++;toast('Deriv LOSS -$'+Math.abs(finalProfit).toFixed(2));}
         $('sessionNet').textContent=(state.sessionNet>=0?'+$':'-$')+Math.abs(state.sessionNet).toFixed(2);
-        $('wins').textContent=state.wins;
-        $('losses').textContent=state.losses;
+        $('wins').textContent=state.wins;$('losses').textContent=state.losses;
         checkLimits();
       }
-      state.pending=null;
-      if(!state.stopped && state.autoSide){
+      if(state.accountMode==='real') state.realOpen.delete(trade.reqId); else state.pending=null;
+      if(state.accountMode==='demo' && !state.stopped && state.autoSide){
         clearTimeout(state.autoTimer);
         state.autoTimer=setTimeout(()=>startDerivTrade(state.autoSide),0);
       }
     }
   }
 }
-
 function checkLimits(){
   const target=Number($('targetProfit').value)||0,stop=Number($('stopLoss').value)||0;
   if(target>0&&state.sessionNet>=target){state.stopped=true;toast('Target profit reached — trading stopped.')}
@@ -441,12 +474,13 @@ document.querySelectorAll('[data-stake]').forEach(b=>b.onclick=()=>setStake(Numb
 $('over').onclick=()=>{state.autoSide='left'; state.accountMode==='demo'?startDemo('left'):startDerivTrade('left')};$('under').onclick=()=>{state.autoSide='right'; state.accountMode==='demo'?startDemo('right'):startDerivTrade('right')};
 $('stopTrade').onclick=()=>{
   state.stopped=!state.stopped;
-  if(!state.stopped && state.accountMode==='demo' && state.autoSide){ state.practiceLastTick=0; } 
+  if(!state.stopped && state.accountMode==='demo' && state.autoSide){ state.practiceLastTick=0; }
+  if(!state.stopped && state.accountMode==='real' && state.autoSide){ state.realLastTick=0; } 
   if(state.stopped){state.autoSide=null;clearTimeout(state.autoTimer);state.autoTimer=null}
   $('stopTrade').textContent=state.stopped?'▶ RESUME':'■ STOP';
   toast(state.stopped?'Trading stopped':'Trading resumed');
 };
-$('reset').onclick=()=>{clearTimeout(state.autoTimer);state.autoTimer=null;state.autoSide=null;state.balance=10000;state.sessionNet=0;state.wins=0;state.losses=0;state.pending=null;state.stopped=false;state.practiceLastTick=0;state.tickSeq=0;ui.balance.textContent='$10,000.00';$('sessionNet').textContent='$0.00';$('wins').textContent='0';$('losses').textContent='0';$('stopTrade').textContent='■ STOP';toast('Demo reset')};
+$('reset').onclick=()=>{clearTimeout(state.autoTimer);state.autoTimer=null;state.autoSide=null;state.balance=10000;state.sessionNet=0;state.wins=0;state.losses=0;state.pending=null;state.stopped=false;state.practiceLastTick=0;state.realLastTick=0;state.realTradesInWindow=0;state.realWindowStart=0;state.realOpen.clear();state.tickSeq=0;ui.balance.textContent='$10,000.00';$('sessionNet').textContent='$0.00';$('wins').textContent='0';$('losses').textContent='0';$('stopTrade').textContent='■ STOP';toast('Demo reset')};
 window.addEventListener('resize',drawChart);
 setStake(.25);updateLabels();setAccountMode('demo');
 state.oauthToken=sessionStorage.getItem('fxtrade_access_token')||null;
