@@ -291,29 +291,43 @@ function startDemo(side){
   toast('Practice '+(side==='left'?'OVER':'UNDER')+' started');
 }
 
+function digitQualifiesForSide(d, side){
+  if(d===null || d===undefined) return false;
+  if(state.contract==='OVERUNDER') return side==='left' ? d>=4 : d<=3;
+  if(state.contract==='EVENODD') return side==='left' ? (d%2===0) : (d%2===1);
+  return true;
+}
+
 function runPracticeTradeOnTick(d){
   if(state.accountMode!=='demo' || !state.autoSide || state.stopped || d===null) return;
-  // One completed practice trade per fresh live tick, matching the prediction
-  // digit cadence instead of a slow timer.
+  // Practice mode settles exactly from the prediction digit on each fresh tick.
+  // Over 3: 4-9 = WIN, 0-3 = LOSS. Under 3: 0-3 = WIN, 4-9 = LOSS.
   if(state.practiceLastTick===state.tickSeq) return;
   state.practiceLastTick=state.tickSeq;
   const side=state.autoSide;
   const stake=Number(state.stake)||0;
   if(!stake) return;
-  let win=false;
-  if(state.contract==='OVERUNDER') win=side==='left'?d>=4:d<=3;
-  else if(state.contract==='EVENODD') win=side==='left'?(d%2===0):(d%2===1);
-  else {
+
+  let win;
+  if(state.contract==='OVERUNDER' || state.contract==='EVENODD') {
+    win=digitQualifiesForSide(d,side);
+  } else {
     const prev=state.prices.length>1?state.prices.at(-2):null;
     const cur=state.prices.at(-1);
     win=side==='left' ? Number(cur)>Number(prev) : Number(cur)<Number(prev);
   }
+
   const profit=win ? stake*state.practicePayout : -stake;
   state.sessionNet+=profit;
   state.balance=10000+state.sessionNet;
   state.wins+=win?1:0;
   state.losses+=win?0:1;
-  $('sessionNet').textContent=(state.sessionNet>=0?'+$':'-$')+Math.abs(state.sessionNet).toFixed(2);
+
+  // Make P/L visibly follow the prediction result immediately.
+  const pnl=$('sessionNet');
+  pnl.textContent=(state.sessionNet>=0?'+$':'-$')+Math.abs(state.sessionNet).toFixed(2);
+  pnl.dataset.lastResult=win?'WIN':'LOSS';
+  pnl.title=win ? `Prediction ${d}: WIN +$${profit.toFixed(2)}` : `Prediction ${d}: LOSS -$${Math.abs(profit).toFixed(2)}`;
   $('wins').textContent=state.wins;
   $('losses').textContent=state.losses;
   ui.balance.textContent='$'+fmt(state.balance);
@@ -325,11 +339,12 @@ function runRealTradeOnTick(d){
   if(state.realLastTick===state.tickSeq) return;
   state.realLastTick=state.tickSeq;
   if(!state.account || !state.authWs || state.authWs.readyState!==WebSocket.OPEN) return;
-  const now=Date.now();
-  if(now-state.realWindowStart>=1000){state.realWindowStart=now;state.realTradesInWindow=0;}
-  // Keep a conservative ceiling below Deriv's shared proposal/buy/open-contract budget.
-  if(state.realTradesInWindow>=3) return;
-  state.realTradesInWindow++;
+  // Use exactly the same digit-side rule as Practice Mode.
+  // For Over 3: 4-9 qualifies for OVER; 0-3 qualifies for UNDER.
+  if(!digitQualifiesForSide(d,state.autoSide)) return;
+  // Keep one real contract at a time so real mode cannot stack several
+  // contracts while the previous one is still being settled.
+  if(state.realOpen.size>0) return;
   startDerivTrade(state.autoSide);
 }
 
