@@ -460,6 +460,9 @@ function handleDerivTradeMessage(d){
         const liveTotal=state.sessionNet+profit;
         $('sessionNet').textContent=(liveTotal>=0?'+$':'-$')+Math.abs(liveTotal).toFixed(2);
       }
+      // Stop immediately when the displayed live P/L reaches a configured
+      // limit, rather than waiting for the contract to settle.
+      checkLimits();
     }
     if(c.is_sold || c.status==='won' || c.status==='lost' || c.status==='sold'){
       const finalProfit=Number(c.profit);
@@ -479,10 +482,35 @@ function handleDerivTradeMessage(d){
     }
   }
 }
+function getEffectivePnl(){
+  // Use the same P/L that is shown to the user. In real mode this includes
+  // live profit/loss from currently open Deriv contracts.
+  if(state.accountMode==='real' && state.realOpen.size){
+    let live=0;
+    for(const t of state.realOpen.values()){
+      const p=Number(t.liveProfit);
+      if(Number.isFinite(p)) live+=p;
+    }
+    return state.sessionNet+live;
+  }
+  return state.sessionNet;
+}
+
 function checkLimits(){
   const target=Number($('targetProfit').value)||0,stop=Number($('stopLoss').value)||0;
-  if(target>0&&state.sessionNet>=target){state.stopped=true;toast('Target profit reached — trading stopped.')}
-  if(stop>0&&state.sessionNet<=-stop){state.stopped=true;toast('Stop loss reached — trading stopped.')}
+  const pnl=getEffectivePnl();
+  if(target>0&&pnl>=target){
+    state.stopped=true;
+    state.autoSide=null;
+    clearTimeout(state.autoTimer);state.autoTimer=null;
+    toast('Target profit reached — trading stopped.');
+  }
+  if(stop>0&&pnl<=-stop){
+    state.stopped=true;
+    state.autoSide=null;
+    clearTimeout(state.autoTimer);state.autoTimer=null;
+    toast('Stop loss reached — trading stopped.');
+  }
   $('stopTrade').textContent=state.stopped?'▶ RESUME':'■ STOP';
 }
 
