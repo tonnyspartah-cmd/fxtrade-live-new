@@ -123,9 +123,18 @@ function onTick(t){
   ui.price.textContent=fmt(q);
   $('tickCount').textContent=state.prices.length+' ticks';
   updateDigits();updateAnalysis();drawChart();
-  updateLivePnlFromTick(d);
+
+  // Settle the local Practice Mode result on THIS SAME tick as the prediction
+  // digit. This keeps prediction digit, win/loss counters and session P/L in
+  // lock-step instead of waiting for a later contract message.
   runPracticeTradeOnTick(d);
+
+  // Real mode is different: the actual Deriv contract result must come from
+  // Deriv's contract stream, not from the displayed prediction digit.
   runRealTradeOnTick(d);
+
+  // Render the final same-tick P/L state after trade processing.
+  updateLivePnlFromTick(d);
 }
 
 function loadHistory(h){
@@ -328,6 +337,12 @@ function runPracticeTradeOnTick(d){
   pnl.textContent=(state.sessionNet>=0?'+$':'-$')+Math.abs(state.sessionNet).toFixed(2);
   pnl.dataset.lastResult=win?'WIN':'LOSS';
   pnl.title=win ? `Prediction ${d}: WIN +$${profit.toFixed(2)}` : `Prediction ${d}: LOSS -$${Math.abs(profit).toFixed(2)}`;
+  const resultEl=$('predictionResult');
+  if(resultEl){
+    resultEl.textContent=win
+      ? `Digit ${d} • WIN +$${profit.toFixed(2)}`
+      : `Digit ${d} • LOSS -$${Math.abs(profit).toFixed(2)}`;
+  }
   $('wins').textContent=state.wins;
   $('losses').textContent=state.losses;
   ui.balance.textContent='$'+fmt(state.balance);
@@ -495,7 +510,7 @@ $('stopTrade').onclick=()=>{
   $('stopTrade').textContent=state.stopped?'▶ RESUME':'■ STOP';
   toast(state.stopped?'Trading stopped':'Trading resumed');
 };
-$('reset').onclick=()=>{clearTimeout(state.autoTimer);state.autoTimer=null;state.autoSide=null;state.balance=10000;state.sessionNet=0;state.wins=0;state.losses=0;state.pending=null;state.stopped=false;state.practiceLastTick=0;state.realLastTick=0;state.realTradesInWindow=0;state.realWindowStart=0;state.realOpen.clear();state.tickSeq=0;ui.balance.textContent='$10,000.00';$('sessionNet').textContent='$0.00';$('wins').textContent='0';$('losses').textContent='0';$('stopTrade').textContent='■ STOP';toast('Demo reset')};
+$('reset').onclick=()=>{clearTimeout(state.autoTimer);state.autoTimer=null;state.autoSide=null;state.balance=10000;state.sessionNet=0;state.wins=0;state.losses=0;state.pending=null;state.stopped=false;state.practiceLastTick=0;state.realLastTick=0;state.realTradesInWindow=0;state.realWindowStart=0;state.realOpen.clear();state.tickSeq=0;ui.balance.textContent='$10,000.00';$('sessionNet').textContent='$0.00';$('wins').textContent='0';$('losses').textContent='0';if($('predictionResult'))$('predictionResult').textContent='Latest tick digit';$('stopTrade').textContent='■ STOP';toast('Demo reset')};
 window.addEventListener('resize',drawChart);
 setStake(.25);updateLabels();setAccountMode('demo');
 state.oauthToken=sessionStorage.getItem('fxtrade_access_token')||null;
