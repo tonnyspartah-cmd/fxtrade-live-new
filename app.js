@@ -354,16 +354,14 @@ function runRealTradeOnTick(d){
   if(state.realLastTick===state.tickSeq) return;
   state.realLastTick=state.tickSeq;
   if(!state.account || !state.authWs || state.authWs.readyState!==WebSocket.OPEN) return;
-  // Use exactly the same digit-side rule as Practice Mode.
-  // For Over 3: 4-9 qualifies for OVER; 0-3 qualifies for UNDER.
-  if(!digitQualifiesForSide(d,state.autoSide)) return;
-  // Keep one real contract at a time so real mode cannot stack several
-  // contracts while the previous one is still being settled.
-  if(state.realOpen.size>0) return;
-  startDerivTrade(state.autoSide);
+  // Every fresh prediction digit is one trade opportunity. Do not filter
+  // out digits based on whether they would win: for OVER 3, digits 0-3
+  // must still create a trade (and lose), while 4-9 create a winning trade.
+  // This keeps prediction changes, trade count, and P/L events in lock-step.
+  startDerivTrade(state.autoSide, d);
 }
 
-function startDerivTrade(side){
+function startDerivTrade(side, predictionDigit=null){
   if(!state.account || !state.authWs || state.authWs.readyState!==WebSocket.OPEN){
     toast('Connect Deriv and select a Demo or Real account first.');
     return;
@@ -386,7 +384,7 @@ function startDerivTrade(side){
   }
 
   const reqId=++state.tradeReqId;
-  const tradeState={phase:'proposal',side,stake,reqId,contract_type};
+  const tradeState={phase:'proposal',side,stake,reqId,contract_type,predictionDigit,createdAtTick:state.tickSeq};
   if(state.accountMode==='real') state.realOpen.set(reqId,tradeState);
   else state.pending=tradeState;
   state.authWs.send(JSON.stringify({
