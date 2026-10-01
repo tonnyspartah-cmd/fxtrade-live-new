@@ -8,7 +8,7 @@ const state = {
   stake:0.25, contract:'OVERUNDER', balance:10000, sessionNet:0,
   wins:0, losses:0, pending:null, stopped:false, autoSide:null, autoTimer:null, reconnect:null,
   accountMode:'demo', oauthToken:null, accounts:[], account:null, authWs:null, authReconnect:null, tradeReqId:1000,
-  practicePayout:0.95, practiceLastTick:0, tickSeq:0, realLastTick:0, realTradesInWindow:0, realWindowStart:0, realOpen:new Map(), autoPattern:false, previousPredictionDigit:null, autoPatternCount:0, autoPatternDigits:[], autoPatternBusy:false, autoPatternTrade:null,autoAfterManual:false
+  practicePayout:0.95, practiceLastTick:0, tickSeq:0, realLastTick:0, realTradesInWindow:0, realWindowStart:0, realOpen:new Map(), feedSession:0, lastTickKey:null, autoPattern:false, previousPredictionDigit:null, autoPatternCount:0, autoPatternDigits:[], autoPatternBusy:false, autoPatternTrade:null,autoAfterManual:false
 };
 const feeds=['wss://api.derivws.com/trading/v1/options/ws/public','wss://ws.binaryws.com/websockets/v3'];
 
@@ -114,7 +114,12 @@ function updateLivePnlFromTick(d){
   $('sessionNet').textContent=(liveTotal>=0?'+$':'-$')+Math.abs(liveTotal).toFixed(2);
 }
 
-function onTick(t){
+function onTick(t,sessionId){
+  // Ignore ticks from a previous WebSocket after a volatility change.
+  if(sessionId!==state.feedSession) return;
+  const tickKey=(t.id!==undefined?t.id:'')+'|'+(t.epoch!==undefined?t.epoch:'')+'|'+String(t.quote);
+  if(tickKey===state.lastTickKey) return;
+  state.lastTickKey=tickKey;
   state.tickSeq++;
   const q=Number(t.quote);if(!Number.isFinite(q))return;
   state.prices.push(q);if(state.prices.length>120)state.prices.shift();
@@ -153,6 +158,8 @@ function subscribe(ws){
 
 function connect(){
   clearTimeout(state.reconnect);
+  const sessionId=++state.feedSession;
+  state.lastTickKey=null;
   setConn('Connecting…');
   const ws=new WebSocket(feeds[0]);state.ws=ws;
   let opened=false;
@@ -162,7 +169,7 @@ function connect(){
       const d=JSON.parse(e.data);
       if(d.error){setConn('Deriv data error');return}
       if(d.msg_type==='history'&&d.history?.prices)loadHistory(d.history.prices);
-      if(d.msg_type==='tick'&&d.tick)onTick(d.tick);
+      if(d.msg_type==='tick'&&d.tick)onTick(d.tick,sessionId);
     }catch(_){}
   };
   ws.onerror=()=>setConn('Connection error');
@@ -634,6 +641,9 @@ ui.derivAccount.onchange=e=>selectDerivAccount(e.target.value);
 
 $('market').onchange=e=>{
   state.symbol=e.target.value;
+  // Invalidate the old stream immediately, before closing it.
+  state.feedSession++;
+  state.lastTickKey=null;
   state.prices=[];
   state.digits=Array(10).fill(0);
   // A volatility/symbol change starts a completely new three-digit sequence.
