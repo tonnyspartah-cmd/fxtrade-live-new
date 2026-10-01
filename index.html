@@ -1,67 +1,80 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>FXTRADE.live — Smart Trading Terminal</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FXTRADE — Smart Digital Trading Simulator</title>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<div class="shell">
+<div class="app">
   <aside class="sidebar">
-    <div class="brand"><div class="brand-mark">FX</div><div><b>FXTRADE</b><span>.live</span><small>SMART TRADING</small></div></div>
-    <nav><button class="nav active">⌂ <span>Dashboard</span></button><button class="nav">◉ <span>Market Scanner</span></button><button class="nav">⚡ <span>Auto Trader</span></button><button class="nav">▦ <span>Trade History</span></button><button class="nav">◌ <span>Risk Manager</span></button></nav>
-    <div class="side-note"><b>Demo first</b><p>Test strategies before using a real Deriv account.</p></div>
+    <div class="brand"><span class="brand-dot"></span> FXTRADE</div>
+    <div class="demo-badge">SIMULATOR • DEMO</div>
+    <nav>
+      <button class="nav active">⌂ <span>Dashboard</span></button>
+      <button class="nav">◈ <span>Markets</span></button>
+      <button class="nav">⌁ <span>Smart Scan</span></button>
+      <button class="nav">▣ <span>Trade History</span></button>
+      <button class="nav">⚙ <span>Settings</span></button>
+    </nav>
+    <div class="side-note">Standalone simulation<br>Not connected to Deriv or any broker.</div>
   </aside>
 
   <main class="main">
     <header class="topbar">
-      <div><div class="eyebrow">TRADING TERMINAL</div><h1>Dashboard</h1></div>
-      <div class="top-actions"><span class="live-dot">● LIVE</span><button id="connectDeriv" class="outline">Connect Deriv</button><button class="avatar">T</button></div>
+      <div><div class="eyebrow">SMART DIGITAL TERMINAL</div><h1>Trading Dashboard</h1></div>
+      <div class="top-actions"><span id="marketState" class="pill live">● LIVE SIM</span><button id="resetBtn" class="ghost">Reset Demo</button></div>
     </header>
 
-    <section class="account-bar">
-      <div class="account-main"><div class="wallet-icon">◈</div><div><small id="accountLabel">Demo Account</small><strong id="balance">$10,000.00</strong></div></div>
-      <div class="account-actions"><div class="mode-switch"><button id="demoMode" class="mode active">DEMO</button><button id="realMode" class="mode">REAL</button></div><button id="reset" class="reset">↻ Reset</button></div>
-    </section>
-    <section id="realPanel" class="real-panel hidden">
-  <div class="connection-head"><div><b>Deriv connection</b><span id="derivStatus">Not connected</span></div><button id="connectDerivPanel" class="small-btn primary-small">Connect</button></div>
-  <div class="oauth-setup">
-    <label>Deriv OAuth Client ID <input id="derivClientId" type="text" inputmode="numeric" autocomplete="off" placeholder="Enter your Client ID"></label>
-    <button id="saveClientId" class="small-btn">Save ID</button>
-  </div>
-  <label>Account <select id="derivAccount"><option value="">Connect to load accounts</option></select></label>
-  <button id="refreshAccounts" class="small-btn">Refresh accounts</button>
-  <p>Use the Client ID from your Deriv developer application. The OAuth redirect must be exactly <code id="redirectUri">https://your-domain/</code>.</p>
-</section>
-
-    <section class="control-row">
-      <div class="field"><label>MARKET</label><select id="market"><option value="1HZ100V">Volatility 100 (1s)</option><option value="1HZ90V">Volatility 90 (1s)</option><option value="1HZ75V">Volatility 75 (1s)</option><option value="1HZ50V">Volatility 50 (1s)</option><option value="1HZ30V">Volatility 30 (1s)</option><option value="1HZ25V">Volatility 25 (1s)</option><option value="1HZ15V">Volatility 15 (1s)</option><option value="1HZ10V">Volatility 10 (1s)</option><option value="R_100">Volatility 100</option><option value="R_75">Volatility 75</option><option value="R_50">Volatility 50</option><option value="R_25">Volatility 25</option><option value="R_10">Volatility 10</option></select></div>
-      <div class="field contract-field"><label>CONTRACT</label><div class="tabs"><button class="contract active" data-contract="OVERUNDER">Over / Under</button><button class="contract" data-contract="RISEFALL">Rise / Fall</button><button class="contract" data-contract="EVENODD">Even / Odd</button></div></div>
-      <div class="scan-box"><div><small>MARKET SCANNER</small><b id="scanStatus">Ready</b></div><button id="deepScan" class="scan-btn">DEEP SCAN ↗</button></div>
+    <section class="stats">
+      <div class="stat"><span>Demo Balance</span><strong id="balance">$1,000.00</strong></div>
+      <div class="stat"><span>Session P/L</span><strong id="pl">$0.00</strong></div>
+      <div class="stat"><span>Wins</span><strong id="wins">0</strong></div>
+      <div class="stat"><span>Losses</span><strong id="losses">0</strong></div>
+      <div class="stat"><span>Win Rate</span><strong id="winrate">0%</strong></div>
     </section>
 
-    <section class="hero-grid">
-      <div class="card live-card"><div class="card-title"><span>LIVE MARKET</span><i>● Connected</i></div><div class="price-line"><strong id="price">—</strong><span id="tickCount">0 ticks</span></div><canvas id="chartCanvas"></canvas></div>
-      <div class="card prediction-card"><div class="card-title"><span>PREDICTION DIGIT</span><i>LIVE</i></div><strong id="digitBig">—</strong><span id="predictionResult">Latest tick digit</span><div class="mini-metrics"><div><small>DIRECTION</small><b id="direction">WAIT</b></div><div><small>CONFIDENCE</small><b id="confidence">—</b></div></div></div>
-      <div class="card scan-card"><div class="card-title"><span>AI MARKET SCAN</span><i>ANALYSIS</i></div><div class="scan-state"><b id="scanSignal">WAIT</b><span id="scanMessage">Run Deep Scan after the live sample loads.</span></div><div class="scan-grid"><div><small>TREND</small><b id="scanTrend">—</b></div><div><small>DIGIT BIAS</small><b id="scanBias">—</b></div><div><small>RISK</small><b id="scanRisk">—</b></div><div><small>SAMPLE</small><b id="scanSample">0</b></div></div></div>
-    </section>
-
-    <section class="workspace">
-      <div class="left-column">
-        <div class="card digits"><div class="section-head"><div><span class="eyebrow">LIVE ANALYTICS</span><h2>Last Digit Analysis</h2></div><div class="strongest">Strongest <b id="strongestDigit">—</b> <span id="strongestPct">—</span></div></div><div id="digitGrid" class="digit-grid"></div><div id="cursor" class="cursor"></div><p class="muted">Distribution is calculated from the latest live Deriv tick sample. The highlighted digit is the current highest-frequency digit.</p></div>
-        <div class="card trade-card"><div class="section-head"><div><span class="eyebrow">EXECUTION</span><h2>Trade Panel</h2></div><span class="status-pill">1-TICK</span></div><div class="trade-layout"><div class="trade-side"><button id="over" class="trade-btn over">↑ <span id="leftTradeLabel">OVER</span></button><small id="leftRule">Digits 4 – 9</small></div><div class="stake-panel"><label>STAKE</label><div class="stake-control"><button data-delta="-1">−</button><strong id="stake">0.25</strong><button data-delta="1">+</button></div><div class="presets"><button data-stake="0.25">$0.25</button><button data-stake="1">$1</button><button data-stake="5">$5</button><button data-stake="10">$10</button></div><div class="risk"><div><label>TARGET PROFIT</label><input id="targetProfit" type="number" min="0" step="0.01" value="3"></div><div><label>STOP LOSS</label><input id="stopLoss" type="number" min="0" step="0.01" value="0"></div></div></div><div class="trade-side"><button id="under" class="trade-btn under">↓ <span id="rightTradeLabel">UNDER</span></button><small id="rightRule">Digits 0 – 3</small></div></div></div>
+    <section class="grid">
+      <div class="card market-card">
+        <div class="card-head"><div><span class="eyebrow">MARKET</span><h2 id="symbolTitle">Synthetic Volatility 100</h2></div>
+          <select id="market"><option>Volatility 100</option><option>Volatility 75</option><option>Volatility 50</option><option>Volatility 25</option><option>Volatility 10</option></select>
+        </div>
+        <div class="price-row"><div><span class="muted">SIMULATED INDEX</span><div id="price" class="price">100000.00</div></div><div class="tick"><span>LAST DIGIT</span><b id="lastDigit">0</b></div></div>
+        <canvas id="chart" height="170"></canvas>
+        <div class="digits" id="digits"></div>
       </div>
-      <div class="right-column">
-        <div class="card pnl-card"><div class="card-title"><span>SESSION PERFORMANCE</span><i>LIVE P/L</i></div><div class="pnl-number" id="sessionNet">$0.00</div><div class="pnl-row"><span>WINS <b id="wins">0</b></span><span>LOSSES <b id="losses">0</b></span></div><div class="progress"><span id="winBar"></span></div></div>
-        <div class="card automation-card"><div class="card-title"><span>AUTOMATION</span><i>CONTROL</i></div><label class="auto-toggle"><input id="autoPattern" type="checkbox"><span class="switch"></span><span><b>3-Digit Auto OVER</b><small>Place after three consecutive 0–3 prediction digits.</small></span></label><button id="stopTrade" class="stop">■ STOP</button><p class="muted">Stop/Resume controls the automated strategy. Target profit and stop loss remain user-configurable.</p></div>
-        <div class="card history-card"><div class="section-head"><div><span class="eyebrow">ACTIVITY</span><h2>Trade Monitor</h2></div><span id="connection">● Connecting…</span></div><div class="monitor-row"><span>Prediction</span><b id="monitorDigit">—</b></div><div class="monitor-row"><span>Signal</span><b id="monitorSignal">WAIT</b></div><div class="monitor-row"><span>Mode</span><b id="monitorMode">DEMO</b></div></div>
+
+      <div class="card scan-card">
+        <div class="card-head"><div><span class="eyebrow">AI-STYLE ANALYSIS</span><h2>Deep Scan</h2></div><button id="scanBtn" class="primary small">SCAN</button></div>
+        <div class="scan-state" id="scanState"><div class="radar"></div><div><b>Ready to scan</b><p>Uses the simulated tick stream only.</p></div></div>
+        <div class="signal"><span>Signal</span><strong id="signal">WAIT</strong></div>
+        <div class="signal"><span>Pattern</span><strong id="pattern">Collecting ticks</strong></div>
+        <div class="signal"><span>Data strength</span><strong id="strength">—</strong></div>
+        <div class="warning">Simulation only. No real market prediction or guaranteed profit.</div>
+      </div>
+
+      <div class="card trade-card">
+        <div class="card-head"><div><span class="eyebrow">ORDER PANEL</span><h2>Place Trade</h2></div><span id="autoBadge" class="pill">AUTO OFF</span></div>
+        <div class="contract-tabs" id="contractTabs">
+          <button class="tab active" data-type="OVER">OVER</button><button class="tab" data-type="UNDER">UNDER</button>
+          <button class="tab" data-type="EVEN">EVEN</button><button class="tab" data-type="ODD">ODD</button>
+        </div>
+        <label>Stake <div class="input-wrap">$<input id="stake" type="number" min="0.10" step="0.10" value="5"></div></label>
+        <div class="quick"><button data-stake="1">$1</button><button data-stake="5">$5</button><button data-stake="10">$10</button><button data-stake="25">$25</button></div>
+        <label>Barrier <div class="input-wrap"><input id="barrier" type="number" min="0" max="9" value="3"></div></label>
+        <div class="row2"><label>Target Profit<div class="input-wrap">$<input id="target" type="number" value="50"></div></label><label>Stop Loss<div class="input-wrap">$<input id="stop" type="number" value="30"></div></label></div>
+        <button id="tradeBtn" class="trade-btn">PLACE SIMULATED TRADE</button>
+        <button id="autoBtn" class="stop-btn">START AUTO</button>
+        <div class="rule">Auto trigger: <b id="triggerCount">3</b> consecutive matching digits.</div>
+      </div>
+
+      <div class="card activity-card">
+        <div class="card-head"><div><span class="eyebrow">PERFORMANCE</span><h2>Live Activity</h2></div><button id="clearBtn" class="ghost small">Clear</button></div>
+        <div class="activity-grid"><div><span>Open trade</span><b id="openTrade">None</b></div><div><span>Last result</span><b id="lastResult">—</b></div><div><span>Target</span><b id="targetView">$50</b></div><div><span>Stop</span><b id="stopView">-$30</b></div></div>
+        <div class="history" id="history"><div class="empty">No trades yet. Start with a demo trade.</div></div>
       </div>
     </section>
-
-    <footer><b>FXTRADE<span>.live</span></b><span>Smart trading terminal · Practice before real trading</span><span>Deriv public market data</span></footer>
   </main>
-</div><div id="toast" class="toast"></div>
+</div>
 <script src="app.js"></script>
 </body></html>

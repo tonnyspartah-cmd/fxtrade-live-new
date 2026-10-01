@@ -1,24 +1,12 @@
-FXTRADE.live redesign package
+# FXTRADE Standalone Simulator
 
-This package redesigns the frontend around the supplied mobile reference:
-- compact purple mobile trading layout
-- volatility selector and live price area
-- digit 0-9 strip
-- AUTO / MANUAL switch
-- stake/presets/target/stop/multiplier area
-- LIVE / T / W / L / running profit bar
-- AI signal card
-- Over/Under, Even/Odd and Rise/Fall support through the existing app.js logic
-- bottom Trade / AI / Positions navigation
+A fresh standalone digital-options-style simulator inspired by the workflow/UI patterns of modern binary trading platforms.
 
-The existing Deriv OAuth and trading code in app.js was retained and the completed
-contract handler now accumulates trade count, wins, losses and actual contract profit.
+IMPORTANT: This project is a simulator. It is NOT connected to Deriv, a broker, or a live market. Prices, ticks, signals and contract outcomes are simulated locally in the browser. It does not guarantee profits and should not be represented as real trading results.
 
-Important: the running profit is not an artificial counter. It changes when a completed
-Deriv contract reports its profit. Trading can lose money; the AI signal is informational.
+Files:
+- index.html
+- styles.css
+- app.js
 
-Deploy the contents of this folder as the website root. Keep your existing Vercel
-/api/oauth/token server route if your OAuth exchange depends on it.
-
-
-V27: If Deriv is authenticated, manual OVER and subsequent 2-digit auto OVER trades are sent through the selected Demo/Real Deriv account. Without authentication, Practice Mode remains local simulation.
+Deploy as a static site on Vercel, Netlify, GitHub Pages, etc.
