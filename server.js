@@ -1,4 +1,9 @@
-const http=require('http'),fs=require('fs'),path=require('path');
-const root=path.join(__dirname,'public');
-const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json'};
-http.createServer((req,res)=>{let p=(req.url||'/').split('?')[0];if(p==='/')p='/index.html';const f=path.normalize(path.join(root,p));if(!f.startsWith(root)||!fs.existsSync(f)){res.writeHead(404);return res.end('Not found')};res.writeHead(200,{'Content-Type':types[path.extname(f)]||'application/octet-stream','Cache-Control':'no-store'});res.end(fs.readFileSync(f));}).listen(process.env.PORT||3000,()=>console.log('FXTRADE standalone running'));
+const http=require("http"),fs=require("fs"),path=require("path");
+const root=path.join(__dirname,"public");
+const server=http.createServer((req,res)=>{
+ if(req.url==="/api/health"){res.writeHead(200,{"Content-Type":"application/json"});return res.end(JSON.stringify({ok:true,mode:"prototype",realMoney:false}))}
+ let p=req.url.split("?")[0]; if(p==="/")p="/index.html";
+ let f=path.join(root,p); if(!f.startsWith(root)||!fs.existsSync(f)){res.writeHead(404);return res.end("Not found")}
+ let ext=path.extname(f),ct=ext===".js"?"text/javascript":ext===".css"?"text/css":"text/html";res.writeHead(200,{"Content-Type":ct});res.end(fs.readFileSync(f));
+});
+server.listen(process.env.PORT||3000,()=>console.log("FXTRADE prototype running"));

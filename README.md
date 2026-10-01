@@ -1,12 +1,7 @@
-# FXTRADE Independent v24
+# FXTRADE Independent v3
 
-Standalone trading simulator. No Deriv API, OAuth, broker login, or external trading connection.
+Standalone architecture prototype. It has a browser UI, an independent simulated tick engine, contract rules, wallet ledger, settlement and trade history.
 
-- Internal synthetic tick engine
-- Over / Under / Even / Odd
-- 3 consecutive matching-digit automatic trigger
-- Demo balance, P/L, win/loss and history
-- Editable stake, barrier, Target Profit and Stop Loss
-- Data stored locally in the browser
+It is **play-money only**. It is not connected to Deriv, a broker, a bank, payment provider, or a live market.
 
-**Important:** all prices, trades and P/L are simulated and are not real financial-market results.
+For a real-money production service, licensing/compliance, a lawful market/odds source, secure server-side custody/ledger, payments, identity/age controls, auditing, responsible-gambling controls and independent security review must be completed before enabling real deposits or withdrawals.
