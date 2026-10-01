@@ -25,7 +25,16 @@
       <div class="account-main"><div class="wallet-icon">◈</div><div><small id="accountLabel">Demo Account</small><strong id="balance">$10,000.00</strong></div></div>
       <div class="account-actions"><div class="mode-switch"><button id="demoMode" class="mode active">DEMO</button><button id="realMode" class="mode">REAL</button></div><button id="reset" class="reset">↻ Reset</button></div>
     </section>
-    <section id="realPanel" class="real-panel hidden"><div><b>Deriv connection</b><span id="derivStatus">Not connected</span></div><label>Account <select id="derivAccount"><option value="">Connect to load accounts</option></select></label><button id="refreshAccounts" class="small-btn">Refresh</button><p>Real mode uses your Deriv account. Keep API credentials private.</p></section>
+    <section id="realPanel" class="real-panel hidden">
+  <div class="connection-head"><div><b>Deriv connection</b><span id="derivStatus">Not connected</span></div><button id="connectDerivPanel" class="small-btn primary-small">Connect</button></div>
+  <div class="oauth-setup">
+    <label>Deriv OAuth Client ID <input id="derivClientId" type="text" inputmode="numeric" autocomplete="off" placeholder="Enter your Client ID"></label>
+    <button id="saveClientId" class="small-btn">Save ID</button>
+  </div>
+  <label>Account <select id="derivAccount"><option value="">Connect to load accounts</option></select></label>
+  <button id="refreshAccounts" class="small-btn">Refresh accounts</button>
+  <p>Use the Client ID from your Deriv developer application. The OAuth redirect must be exactly <code id="redirectUri">https://your-domain/</code>.</p>
+</section>
 
     <section class="control-row">
       <div class="field"><label>MARKET</label><select id="market"><option value="1HZ100V">Volatility 100 (1s)</option><option value="1HZ90V">Volatility 90 (1s)</option><option value="1HZ75V">Volatility 75 (1s)</option><option value="1HZ50V">Volatility 50 (1s)</option><option value="1HZ30V">Volatility 30 (1s)</option><option value="1HZ25V">Volatility 25 (1s)</option><option value="1HZ15V">Volatility 15 (1s)</option><option value="1HZ10V">Volatility 10 (1s)</option><option value="R_100">Volatility 100</option><option value="R_75">Volatility 75</option><option value="R_50">Volatility 50</option><option value="R_25">Volatility 25</option><option value="R_10">Volatility 10</option></select></div>

@@ -180,6 +180,8 @@ function connect(){
 
 const DERIV_API='https://api.derivws.com';
 const DERIV_CLIENT_ID=window.FXTRADE_DERIV_CLIENT_ID || localStorage.getItem('fxtrade_deriv_client_id') || '';
+function getClientId(){ return (window.FXTRADE_DERIV_CLIENT_ID || localStorage.getItem('fxtrade_deriv_client_id') || $('derivClientId')?.value || '').trim(); }
+function setClientId(v){ const id=String(v||'').trim(); if(id) localStorage.setItem('fxtrade_deriv_client_id',id); return id; }
 const OAUTH_SCOPE='trade';
 
 function base64url(bytes){return btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}
@@ -187,12 +189,16 @@ function randomString(n=64){const a=new Uint8Array(n);crypto.getRandomValues(a);
 async function sha256(s){return crypto.subtle.digest('SHA-256',new TextEncoder().encode(s))}
 
 async function connectDeriv(){
-  let clientId=window.FXTRADE_DERIV_CLIENT_ID || localStorage.getItem('fxtrade_deriv_client_id') || '';
+  let clientId=getClientId();
   if(!clientId){
-    clientId=prompt('Enter your Deriv OAuth Client ID from developers.deriv.com:','');
-    if(!clientId)return;
-    localStorage.setItem('fxtrade_deriv_client_id',clientId.trim());
+    if($('realPanel')) $('realPanel').classList.remove('hidden');
+    $('derivStatus').textContent='Client ID required';
+    toast('Enter your Deriv OAuth Client ID first');
+    $('derivClientId')?.focus();
+    return;
   }
+  setClientId(clientId);
+  if($('derivClientId')) $('derivClientId').value=clientId;
   const verifier=randomString(64), challenge=base64url(await sha256(verifier)), state=randomString(24);
   sessionStorage.setItem('fxtrade_pkce_verifier',verifier);
   sessionStorage.setItem('fxtrade_oauth_state',state);
@@ -215,7 +221,7 @@ async function handleOAuthCallback(){
   try{
     ui.derivStatus.textContent='Authorizing…';
     const r=await fetch('/api/oauth/token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,code_verifier:verifier,redirect_uri:location.origin+'/',client_id:clientId})});
-    const data=await r.json(); if(!r.ok || !data.access_token) throw new Error(data.error||'Token exchange failed');
+    const data=await r.json().catch(()=>({})); if(!r.ok || !data.access_token) throw new Error(data.error_description||data.error||data.message||('Token exchange failed ('+r.status+')'));
     state.oauthToken=data.access_token;
     sessionStorage.setItem('fxtrade_access_token',data.access_token);
     sessionStorage.removeItem('fxtrade_oauth_state');sessionStorage.removeItem('fxtrade_pkce_verifier');
@@ -223,6 +229,7 @@ async function handleOAuthCallback(){
     await loadDerivAccounts();
     toast('Deriv connected');
   }catch(e){ui.derivStatus.textContent='Connection failed';toast(e.message||'Deriv connection failed')}
+
 }
 
 async function derivFetch(path, options={}){
@@ -634,6 +641,10 @@ function checkLimits(){
 }
 
 $('connectDeriv').onclick=connectDeriv;
+$('connectDerivPanel')?.addEventListener('click',connectDeriv);
+$('saveClientId')?.addEventListener('click',()=>{const id=setClientId($('derivClientId').value); $('derivClientId').value=id; $('derivStatus').textContent=id?'Client ID saved':'Client ID required'; if(id) toast('Client ID saved on this device');});
+if($('derivClientId')) $('derivClientId').value=getClientId();
+if($('redirectUri')) $('redirectUri').textContent=location.origin+'/';
 $('demoMode').onclick=()=>setAccountMode('demo');
 $('realMode').onclick=()=>setAccountMode('real');
 $('refreshAccounts').onclick=()=>state.oauthToken?loadDerivAccounts():toast('Connect Deriv first');
