@@ -641,7 +641,13 @@ $('market').onchange=e=>{
   state.autoPatternDigits=[];
   state.autoPatternCount=0;
   state.previousPredictionDigit=null;
+  // A volatility/symbol change must also discard any locally simulated
+  // auto-trade state. Otherwise the first ticks of the new symbol can be
+  // treated as the continuation of the previous symbol's sequence.
+  state.autoPatternTrade=null;
   state.autoPatternBusy=false;
+  state.practiceLastTick=0;
+  state.realLastTick=0;
   try{state.ws.close()}catch(_){}
   connect();
 };
