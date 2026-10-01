@@ -2,29 +2,28 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>FXTRADE — Independent Trading Platform v28 Sandbox</title>
+<title>FXTRADE — Independent Trading Simulator v27.1</title>
 <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
 <div class="app">
   <aside class="sidebar">
     <div class="brand"><span class="brand-dot"></span> FXTRADE</div>
-    <div class="demo-badge">SANDBOX • V28</div>
+    <div class="demo-badge">SIMULATOR • DEMO</div>
     <nav>
       <button class="nav active" data-section="dashboard">⌂ <span>Dashboard</span></button>
-      <button class="nav" data-section="account">◉ <span>Account</span></button>
       <button class="nav" data-section="wallet">▣ <span>Wallet</span></button>
       <button class="nav" data-section="trades">◷ <span>Trade History</span></button>
       <button class="nav" data-section="transactions">⇄ <span>Transactions</span></button>
       <button class="nav" data-section="settings">⚙ <span>Settings</span></button>
     </nav>
-    <div class="side-note">Independent sandbox<br>Real-money payments are not connected.</div>
+    <div class="side-note">Standalone simulation<br>Demo wallet only. No real deposits, withdrawals or broker connection.</div>
   </aside>
 
   <main class="main">
     <header class="topbar">
       <div><div class="eyebrow">SMART DIGITAL TERMINAL</div><h1>Trading Dashboard</h1></div>
-      <div class="top-actions"><span class="pill live" id="modeBadge">● SANDBOX</span><button class="ghost account-jump" data-jump="wallet">Wallet</button><button class="ghost account-jump" data-jump="trades">History</button><button id="resetBtn" class="ghost">Reset Demo</button></div>
+      <div class="top-actions"><span class="pill live">● LIVE SIM</span><button class="ghost account-jump" data-jump="wallet">Wallet</button><button class="ghost account-jump" data-jump="trades">History</button><button id="resetBtn" class="ghost">Reset Demo</button></div>
     </header>
 
     <div class="account-strip"><div><span>ACCOUNT</span><b id="accountName">FXTRADE Demo User</b></div><div><span>WALLET</span><b id="accountWallet">$1,000.00</b></div><div><span>TRADES</span><b id="accountTrades">0</b></div><button class="primary small account-jump" data-jump="wallet">MANAGE WALLET</button></div>
@@ -35,33 +34,6 @@
       <div class="stat"><span>Wins</span><strong id="wins">0</strong></div>
       <div class="stat"><span>Losses</span><strong id="losses">0</strong></div>
       <div class="stat"><span>Win Rate</span><strong id="winrate">0%</strong></div>
-    </section>
-
-    <section id="account" class="section">
-      <div class="page-title"><div><span class="eyebrow">USER ACCOUNT</span><h2>Account & Verification</h2></div><span class="pill">SANDBOX</span></div>
-      <div class="account-grid">
-        <div class="card" id="authCard">
-          <h2>Sign in / Create account</h2>
-          <p class="muted">This creates a sandbox account. It does not accept real money.</p>
-          <label>Email<div class="input-wrap"><input id="authEmail" type="email" placeholder="you@example.com"></div></label>
-          <label>Password<div class="input-wrap"><input id="authPassword" type="password" placeholder="Minimum 8 characters"></div></label>
-          <div class="row2"><button id="registerBtn" class="primary">CREATE ACCOUNT</button><button id="loginBtn" class="ghost">SIGN IN</button></div>
-          <div id="authMsg" class="muted account-msg"></div>
-        </div>
-        <div class="card">
-          <h2>Profile</h2>
-          <div class="profile-line"><span>Status</span><b id="accountStatus">Not signed in</b></div>
-          <div class="profile-line"><span>Email</span><b id="accountEmail">—</b></div>
-          <div class="profile-line"><span>Verification</span><b id="kycStatus">Not started</b></div>
-          <button id="logoutBtn" class="stop-btn">SIGN OUT</button>
-        </div>
-      </div>
-      <div class="card kyc-card">
-        <h2>Verification details</h2><p class="muted">Required before a production operator could process real-money withdrawals. This sandbox only stores the form locally/server-side for testing.</p>
-        <div class="row2"><label>Full name<div class="input-wrap"><input id="kycName" placeholder="Full name"></div></label><label>Phone<div class="input-wrap"><input id="kycPhone" placeholder="+254..."></div></label></div>
-        <button id="saveKycBtn" class="primary">SAVE VERIFICATION DETAILS</button>
-      </div>
-      <div class="warning">Real deposits and withdrawals are intentionally disabled. A production deployment needs an approved payment provider, server-side ledger, KYC/AML controls, licensing and reconciliation before real customer funds are accepted.</div>
     </section>
 
     <section id="dashboard" class="section active-section">
@@ -100,11 +72,11 @@
     </section>
 
     <section id="wallet" class="section">
-      <div class="page-title"><div><span class="eyebrow">ACCOUNT WALLET</span><h2>Balance & Funds</h2></div><span class="pill">SANDBOX WALLET</span></div>
+      <div class="page-title"><div><span class="eyebrow">ACCOUNT WALLET</span><h2>Balance & Funds</h2></div><span class="pill">DEMO WALLET</span></div>
       <div class="wallet-grid">
-        <div class="card wallet-balance"><span class="muted">AVAILABLE SANDBOX BALANCE</span><strong id="walletBalance">$1,000.00</strong><p>Used for sandbox trades only.</p></div>
-        <div class="card"><h2>Deposit request</h2><p class="muted">Sandbox request only. No real payment is processed.</p><div class="input-wrap">$<input id="depositAmount" type="number" min="1" step="1" value="100"></div><button id="depositBtn" class="trade-btn">REQUEST SANDBOX DEPOSIT</button></div>
-        <div class="card"><h2>Withdrawal request</h2><p class="muted">Sandbox request only. No money is sent.</p><div class="input-wrap">$<input id="withdrawAmount" type="number" min="1" step="1" value="50"></div><button id="withdrawBtn" class="stop-btn">REQUEST SANDBOX WITHDRAWAL</button></div>
+        <div class="card wallet-balance"><span class="muted">AVAILABLE DEMO BALANCE</span><strong id="walletBalance">$1,000.00</strong><p>Used for simulated trades only.</p></div>
+        <div class="card"><h2>Deposit</h2><p class="muted">Adds demo funds instantly. No payment is processed.</p><div class="input-wrap">$<input id="depositAmount" type="number" min="1" step="1" value="100"></div><button id="depositBtn" class="trade-btn">DEPOSIT DEMO FUNDS</button></div>
+        <div class="card"><h2>Withdraw</h2><p class="muted">Creates a simulated withdrawal and deducts from demo balance.</p><div class="input-wrap">$<input id="withdrawAmount" type="number" min="1" step="1" value="50"></div><button id="withdrawBtn" class="stop-btn">WITHDRAW DEMO FUNDS</button></div>
       </div>
       <div class="warning">Real-money deposits and withdrawals are not enabled. A production version would require a secure server-side wallet, payment provider, identity/compliance controls and transaction reconciliation.</div>
     </section>

@@ -11,8 +11,7 @@
           "app.js",
           "ai-signal.html",
           "ai-signal.js",
-          "oauth-callback.html",
-          "token.js"
+
         ]
       }
     }
