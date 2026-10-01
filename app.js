@@ -8,7 +8,7 @@ const state = {
   stake:0.25, contract:'OVERUNDER', balance:10000, sessionNet:0,
   wins:0, losses:0, pending:null, stopped:false, autoSide:null, autoTimer:null, reconnect:null,
   accountMode:'demo', oauthToken:null, accounts:[], account:null, authWs:null, authReconnect:null, tradeReqId:1000,
-  practicePayout:0.95, practiceLastTick:0, tickSeq:0, realLastTick:0, realTradesInWindow:0, realWindowStart:0, realOpen:new Map(), autoPattern:false, previousPredictionDigit:null
+  practicePayout:0.95, practiceLastTick:0, tickSeq:0, realLastTick:0, realTradesInWindow:0, realWindowStart:0, realOpen:new Map(), autoPattern:false, previousPredictionDigit:null, autoPatternBusy:false
 };
 const feeds=['wss://api.derivws.com/trading/v1/options/ws/public','wss://ws.binaryws.com/websockets/v3'];
 
@@ -124,14 +124,16 @@ function onTick(t){
   $('tickCount').textContent=state.prices.length+' ticks';
   updateDigits();updateAnalysis();drawChart();
 
-  // Settle the local Practice Mode result on THIS SAME tick as the prediction
-  // digit. This keeps prediction digit, win/loss counters and session P/L in
-  // lock-step instead of waiting for a later contract message.
-  runPracticeTradeOnTick(d);
-
-  // Real mode is different: the actual Deriv contract result must come from
-  // Deriv's contract stream, not from the displayed prediction digit.
-  runRealTradeOnTick(d);
+  // Automatic strategies are evaluated exactly once per fresh prediction digit.
+  // With a connected Deriv account, the qualifying pair places an actual Deriv
+  // contract (Demo or Real). Without an authenticated account, Practice Mode
+  // uses the local simulator.
+  if(state.autoPattern){
+    runTwoDigitAutoTick(d);
+  }else{
+    runPracticeTradeOnTick(d);
+    runRealTradeOnTick(d);
+  }
 
   // Render the final same-tick P/L state after trade processing.
   updateLivePnlFromTick(d);
@@ -307,17 +309,61 @@ function digitQualifiesForSide(d, side){
   return true;
 }
 
+function runTwoDigitAutoTick(d){
+  if(state.stopped || d===null) return;
+
+  // The strategy is a pair-trigger, not a continuous auto-trader:
+  // 0-3,0-3 => exactly one OVER trade, then wait for a completely new pair.
+  const prev=state.previousPredictionDigit;
+  const qualifies=prev!==null && prev<=3 && d<=3;
+  state.previousPredictionDigit=d;
+  if(!qualifies) return;
+
+  // Consume the pair immediately so the same pair can never fire twice.
+  state.previousPredictionDigit=null;
+
+  // One contract at a time for this strategy. If a previous contract is still
+  // open, this signal is ignored and the strategy resumes scanning for a new pair.
+  const busy = state.accountMode==='real' ? state.realOpen.size>0 : !!state.pending;
+  if(busy || state.autoPatternBusy) return;
+
+  state.autoPatternBusy=true;
+  if(state.account && state.authWs && state.authWs.readyState===WebSocket.OPEN){
+    startDerivTrade('left',d);
+  }else{
+    // No authenticated account: fall back to local Practice Mode so the
+    // strategy can still be tested without placing a broker contract.
+    runPracticeAutoTrade(d);
+  }
+}
+
+function runPracticeAutoTrade(d){
+  const stake=Number(state.stake)||0;
+  if(!stake){ state.autoPatternBusy=false; return; }
+  const win=d>=4;
+  const profit=win ? stake*state.practicePayout : -stake;
+  state.sessionNet+=profit;
+  state.balance=10000+state.sessionNet;
+  state.wins+=win?1:0;
+  state.losses+=win?0:1;
+  const pnl=$('sessionNet');
+  pnl.textContent=(state.sessionNet>=0?'+$':'-$')+Math.abs(state.sessionNet).toFixed(2);
+  pnl.dataset.lastResult=win?'WIN':'LOSS';
+  pnl.title=win ? `Prediction ${d}: WIN +$${profit.toFixed(2)}` : `Prediction ${d}: LOSS -$${Math.abs(profit).toFixed(2)}`;
+  const resultEl=$('predictionResult');
+  if(resultEl) resultEl.textContent=win ? `Digit ${d} • WIN +$${profit.toFixed(2)}` : `Digit ${d} • LOSS -$${Math.abs(profit).toFixed(2)}`;
+  $('wins').textContent=state.wins;$('losses').textContent=state.losses;
+  ui.balance.textContent='$'+fmt(state.balance);
+  state.autoPatternBusy=false;
+  checkLimits();
+}
+
 function runPracticeTradeOnTick(d){
   if(state.accountMode!=='demo' || state.stopped || d===null) return;
   // Optional automatic strategy: two consecutive digits in 0-3 trigger ONE Over 3 trade.
   // The trigger is evaluated on the same prediction tick so prediction, trade count and P/L stay synchronized.
-  if(state.autoPattern){
-    const triggered = state.previousPredictionDigit!==null && state.previousPredictionDigit<=3 && d<=3;
-    state.previousPredictionDigit=d;
-    if(!triggered || state.practiceLastTick===state.tickSeq) return;
-    state.practiceLastTick=state.tickSeq;
-    state.autoSide='left';
-  } else {
+  if(state.autoPattern) return;
+  else {
     if(!state.autoSide || state.practiceLastTick===state.tickSeq) return;
     state.practiceLastTick=state.tickSeq;
   }
@@ -363,14 +409,7 @@ function runRealTradeOnTick(d){
   state.realLastTick=state.tickSeq;
   if(!state.account || !state.authWs || state.authWs.readyState!==WebSocket.OPEN) return;
 
-  if(state.autoPattern){
-    const triggered = state.previousPredictionDigit!==null && state.previousPredictionDigit<=3 && d<=3;
-    state.previousPredictionDigit=d;
-    if(!triggered) return;
-    // The second consecutive 0-3 digit triggers one automatic OVER 3 trade.
-    startDerivTrade('left', d);
-    return;
-  }
+  if(state.autoPattern) return;
 
   if(!state.autoSide) return;
   // Manual auto-trading mode: every fresh prediction digit is one trade opportunity.
@@ -491,7 +530,10 @@ function handleDerivTradeMessage(d){
         checkLimits();
       }
       if(state.accountMode==='real') state.realOpen.delete(trade.reqId); else state.pending=null;
-      if(state.accountMode==='demo' && !state.stopped && state.autoSide){
+      if(state.autoPattern){
+        state.autoPatternBusy=false;
+        state.previousPredictionDigit=null;
+      }else if(state.accountMode==='demo' && !state.stopped && state.autoSide){
         clearTimeout(state.autoTimer);
         state.autoTimer=setTimeout(()=>startDerivTrade(state.autoSide),0);
       }
@@ -549,7 +591,7 @@ $('autoPattern').onchange=e=>{
   state.autoPattern=e.target.checked;
   state.previousPredictionDigit=null;
   state.autoSide=e.target.checked?'left':null;
-  state.practiceLastTick=0; state.realLastTick=0;
+  state.practiceLastTick=0; state.realLastTick=0; state.autoPatternBusy=false;
   toast(e.target.checked?'2-digit auto OVER enabled: two consecutive 0-3 digits trigger a trade.':'2-digit auto disabled');
 };
 $('stopTrade').onclick=()=>{
@@ -560,7 +602,7 @@ $('stopTrade').onclick=()=>{
   $('stopTrade').textContent=state.stopped?'▶ RESUME':'■ STOP';
   toast(state.stopped?'Trading stopped':'Trading resumed');
 };
-$('reset').onclick=()=>{clearTimeout(state.autoTimer);state.autoTimer=null;state.autoSide=null;state.balance=10000;state.sessionNet=0;state.wins=0;state.losses=0;state.pending=null;state.stopped=false;state.practiceLastTick=0;state.realLastTick=0;state.realTradesInWindow=0;state.realWindowStart=0;state.realOpen.clear();state.tickSeq=0;state.autoPattern=false;state.previousPredictionDigit=null;if($('autoPattern'))$('autoPattern').checked=false;ui.balance.textContent='$10,000.00';$('sessionNet').textContent='$0.00';$('wins').textContent='0';$('losses').textContent='0';if($('predictionResult'))$('predictionResult').textContent='Latest tick digit';$('stopTrade').textContent='■ STOP';toast('Demo reset')};
+$('reset').onclick=()=>{clearTimeout(state.autoTimer);state.autoTimer=null;state.autoSide=null;state.balance=10000;state.sessionNet=0;state.wins=0;state.losses=0;state.pending=null;state.stopped=false;state.practiceLastTick=0;state.realLastTick=0;state.realTradesInWindow=0;state.realWindowStart=0;state.realOpen.clear();state.tickSeq=0;state.autoPattern=false;state.previousPredictionDigit=null;state.autoPatternBusy=false;if($('autoPattern'))$('autoPattern').checked=false;ui.balance.textContent='$10,000.00';$('sessionNet').textContent='$0.00';$('wins').textContent='0';$('losses').textContent='0';if($('predictionResult'))$('predictionResult').textContent='Latest tick digit';$('stopTrade').textContent='■ STOP';toast('Demo reset')};
 window.addEventListener('resize',drawChart);
 setStake(.25);updateLabels();setAccountMode('demo');
 state.oauthToken=sessionStorage.getItem('fxtrade_access_token')||null;
