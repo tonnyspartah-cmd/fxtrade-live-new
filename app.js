@@ -695,6 +695,36 @@ $('stopTrade').onclick=()=>{
   toast(state.stopped?'Trading stopped':'Trading resumed');
 };
 $('reset').onclick=()=>{clearTimeout(state.autoTimer);state.autoTimer=null;state.autoSide=null;state.balance=10000;state.sessionNet=0;state.wins=0;state.losses=0;state.pending=null;state.stopped=false;state.practiceLastTick=0;state.realLastTick=0;state.realTradesInWindow=0;state.realWindowStart=0;state.realOpen.clear();state.tickSeq=0;state.autoPattern=false;state.autoAfterManual=false;state.previousPredictionDigit=null;state.autoPatternCount=0;state.autoPatternDigits=[];state.autoPatternBusy=false;state.autoPatternTrade=null;if($('autoPattern'))$('autoPattern').checked=false;ui.balance.textContent='$10,000.00';$('sessionNet').textContent='$0.00';$('wins').textContent='0';$('losses').textContent='0';if($('predictionResult'))$('predictionResult').textContent='Latest tick digit';$('stopTrade').textContent='■ STOP';toast('Demo reset')};
+
+function runDeepScan(){
+  const sample=state.prices.slice(-50);
+  const status=$('scanStatus'), signal=$('scanSignal');
+  if(sample.length<10){toast('Waiting for more live ticks before scanning.');return}
+  const first=sample[0], last=sample.at(-1), delta=last-first;
+  const half=Math.floor(sample.length/2);
+  const a=sample.slice(0,half).reduce((x,y)=>x+y,0)/half;
+  const b=sample.slice(half).reduce((x,y)=>x+y,0)/(sample.length-half);
+  const trend=delta>0&&b>=a?'UP':delta<0&&b<=a?'DOWN':'MIXED';
+  const over=state.digits.slice(4).reduce((x,y)=>x+y,0);
+  const under=state.digits.slice(0,4).reduce((x,y)=>x+y,0);
+  const bias=over===under?'BALANCED':over>under?'OVER 4–9':'UNDER 0–3';
+  const concentration=Math.max(...state.digits)/Math.max(1,state.digits.reduce((x,y)=>x+y,0));
+  const risk=sample.length<25||concentration>.22?'HIGH':concentration>.15?'MEDIUM':'LOW';
+  const dir=state.contract==='OVERUNDER'?(trend==='UP'?'OVER':trend==='DOWN'?'UNDER':'WAIT'):state.direction?.textContent||'WAIT';
+  $('scanTrend').textContent=trend;$('scanBias').textContent=bias;$('scanRisk').textContent=risk;$('scanSample').textContent=sample.length;
+  signal.textContent=dir; signal.style.color=dir==='UNDER'?'#ff5267':dir==='OVER'?'#20d486':'#f4c84b';
+  $('scanMessage').textContent=`Live sample scanned: trend, digit distribution and recent movement. This is analysis, not a guaranteed outcome.`;
+  status.textContent='Scan complete'; $('monitorSignal').textContent=dir; $('monitorDigit').textContent=$('digitBig').textContent;
+  toast('Deep Scan complete');
+}
+$('deepScan').onclick=runDeepScan;
+const oldOnTick=onTick;
+const scanTickObserver=()=>{ if($('monitorDigit')) $('monitorDigit').textContent=$('digitBig').textContent; if($('monitorSignal')) $('monitorSignal').textContent=$('direction').textContent; if($('monitorMode')) $('monitorMode').textContent=state.accountMode.toUpperCase(); if($('winBar')) $('winBar').style.width=((state.wins+state.losses)?(state.wins/(state.wins+state.losses)*100):0)+'%'; };
+const originalUpdateDigits=updateDigits;
+updateDigits=function(){ originalUpdateDigits(); scanTickObserver(); };
+const originalSetAccountMode=setAccountMode;
+setAccountMode=function(mode){ originalSetAccountMode(mode); if($('monitorMode')) $('monitorMode').textContent=mode.toUpperCase(); };
+
 window.addEventListener('resize',drawChart);
 setStake(.25);updateLabels();setAccountMode('demo');
 state.oauthToken=sessionStorage.getItem('fxtrade_access_token')||null;
