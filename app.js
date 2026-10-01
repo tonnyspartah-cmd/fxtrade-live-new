@@ -8,7 +8,7 @@ const state = {
   stake:0.25, contract:'OVERUNDER', balance:10000, sessionNet:0,
   wins:0, losses:0, pending:null, stopped:false, autoSide:null, autoTimer:null, reconnect:null,
   accountMode:'demo', oauthToken:null, accounts:[], account:null, authWs:null, authReconnect:null, tradeReqId:1000,
-  practicePayout:0.95, practiceLastTick:0, tickSeq:0, realLastTick:0, realTradesInWindow:0, realWindowStart:0, realOpen:new Map(), autoPattern:false, previousPredictionDigit:null, autoPatternBusy:false, autoPatternTrade:null
+  practicePayout:0.95, practiceLastTick:0, tickSeq:0, realLastTick:0, realTradesInWindow:0, realWindowStart:0, realOpen:new Map(), autoPattern:false, previousPredictionDigit:null, autoPatternBusy:false, autoPatternTrade:null,autoAfterManual:false
 };
 const feeds=['wss://api.derivws.com/trading/v1/options/ws/public','wss://ws.binaryws.com/websockets/v3'];
 
@@ -419,6 +419,15 @@ function runPracticeTradeOnTick(d){
   $('losses').textContent=state.losses;
   ui.balance.textContent='$'+fmt(state.balance);
   checkLimits();
+  if(state.autoAfterManual && !state.stopped){
+    state.autoAfterManual=false;
+    state.autoPattern=true;
+    state.autoSide='left';
+    state.previousPredictionDigit=null;
+    state.autoPatternBusy=false;
+    if($('autoPattern')) $('autoPattern').checked=true;
+    toast('Manual OVER finished — waiting for two consecutive 0–3 digits.');
+  }
 }
 
 function runRealTradeOnTick(d){
@@ -548,6 +557,15 @@ function handleDerivTradeMessage(d){
         checkLimits();
       }
       if(state.accountMode==='real') state.realOpen.delete(trade.reqId); else state.pending=null;
+      if(state.autoAfterManual && !state.stopped){
+        state.autoAfterManual=false;
+        state.autoPattern=true;
+        state.autoSide='left';
+        state.previousPredictionDigit=null;
+        state.autoPatternBusy=false;
+        if($('autoPattern')) $('autoPattern').checked=true;
+        toast('Manual OVER finished — waiting for two consecutive 0–3 digits.');
+      }
       if(state.autoPattern){
         state.autoPatternBusy=false;
         state.previousPredictionDigit=null;
@@ -603,7 +621,16 @@ document.querySelectorAll('.contract').forEach(b=>b.onclick=()=>{
 });
 document.querySelectorAll('[data-delta]').forEach(b=>b.onclick=()=>setStake(state.stake+Number(b.dataset.delta)));
 document.querySelectorAll('[data-stake]').forEach(b=>b.onclick=()=>setStake(Number(b.dataset.stake)));
-$('over').onclick=()=>{state.autoPattern=false;if($('autoPattern'))$('autoPattern').checked=false;state.autoSide='left'; state.accountMode==='demo'?startDemo('left'):startDerivTrade('left')};
+$('over').onclick=()=>{
+  state.autoPattern=false;
+  state.autoAfterManual=true;
+  state.previousPredictionDigit=null;
+  state.autoPatternBusy=false;
+  if($('autoPattern'))$('autoPattern').checked=false;
+  state.autoSide='left';
+  state.accountMode==='demo'?startDemo('left'):startDerivTrade('left');
+  toast('OVER placed manually — after it finishes, wait for two consecutive 0–3 digits for the next automatic OVER trade.');
+};
 $('under').onclick=()=>{state.autoPattern=false;if($('autoPattern'))$('autoPattern').checked=false;state.autoSide='right'; state.accountMode==='demo'?startDemo('right'):startDerivTrade('right')};
 $('autoPattern').onchange=e=>{
   state.autoPattern=e.target.checked;
@@ -620,7 +647,7 @@ $('stopTrade').onclick=()=>{
   $('stopTrade').textContent=state.stopped?'▶ RESUME':'■ STOP';
   toast(state.stopped?'Trading stopped':'Trading resumed');
 };
-$('reset').onclick=()=>{clearTimeout(state.autoTimer);state.autoTimer=null;state.autoSide=null;state.balance=10000;state.sessionNet=0;state.wins=0;state.losses=0;state.pending=null;state.stopped=false;state.practiceLastTick=0;state.realLastTick=0;state.realTradesInWindow=0;state.realWindowStart=0;state.realOpen.clear();state.tickSeq=0;state.autoPattern=false;state.previousPredictionDigit=null;state.autoPatternBusy=false;state.autoPatternTrade=null;if($('autoPattern'))$('autoPattern').checked=false;ui.balance.textContent='$10,000.00';$('sessionNet').textContent='$0.00';$('wins').textContent='0';$('losses').textContent='0';if($('predictionResult'))$('predictionResult').textContent='Latest tick digit';$('stopTrade').textContent='■ STOP';toast('Demo reset')};
+$('reset').onclick=()=>{clearTimeout(state.autoTimer);state.autoTimer=null;state.autoSide=null;state.balance=10000;state.sessionNet=0;state.wins=0;state.losses=0;state.pending=null;state.stopped=false;state.practiceLastTick=0;state.realLastTick=0;state.realTradesInWindow=0;state.realWindowStart=0;state.realOpen.clear();state.tickSeq=0;state.autoPattern=false;state.autoAfterManual=false;state.previousPredictionDigit=null;state.autoPatternBusy=false;state.autoPatternTrade=null;if($('autoPattern'))$('autoPattern').checked=false;ui.balance.textContent='$10,000.00';$('sessionNet').textContent='$0.00';$('wins').textContent='0';$('losses').textContent='0';if($('predictionResult'))$('predictionResult').textContent='Latest tick digit';$('stopTrade').textContent='■ STOP';toast('Demo reset')};
 window.addEventListener('resize',drawChart);
 setStake(.25);updateLabels();setAccountMode('demo');
 state.oauthToken=sessionStorage.getItem('fxtrade_access_token')||null;
