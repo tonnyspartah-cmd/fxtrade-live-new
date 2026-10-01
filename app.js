@@ -632,7 +632,19 @@ $('realMode').onclick=()=>setAccountMode('real');
 $('refreshAccounts').onclick=()=>state.oauthToken?loadDerivAccounts():toast('Connect Deriv first');
 ui.derivAccount.onchange=e=>selectDerivAccount(e.target.value);
 
-$('market').onchange=e=>{state.symbol=e.target.value;state.prices=[];state.digits=Array(10).fill(0);try{state.ws.close()}catch(_){}connect()};
+$('market').onchange=e=>{
+  state.symbol=e.target.value;
+  state.prices=[];
+  state.digits=Array(10).fill(0);
+  // A volatility/symbol change starts a completely new three-digit sequence.
+  // Never carry qualifying digits from the previous volatility into the new one.
+  state.autoPatternDigits=[];
+  state.autoPatternCount=0;
+  state.previousPredictionDigit=null;
+  state.autoPatternBusy=false;
+  try{state.ws.close()}catch(_){}
+  connect();
+};
 document.querySelectorAll('.contract').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('.contract').forEach(x=>x.classList.remove('active'));b.classList.add('active');
   state.contract=b.dataset.contract;updateLabels();updateAnalysis();
