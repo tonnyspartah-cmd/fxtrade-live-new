@@ -1,9 +1,53 @@
-const http=require("http"),fs=require("fs"),path=require("path");
-const root=path.join(__dirname,"public");
-const server=http.createServer((req,res)=>{
- if(req.url==="/api/health"){res.writeHead(200,{"Content-Type":"application/json"});return res.end(JSON.stringify({ok:true,mode:"prototype",realMoney:false}))}
- let p=req.url.split("?")[0]; if(p==="/")p="/index.html";
- let f=path.join(root,p); if(!f.startsWith(root)||!fs.existsSync(f)){res.writeHead(404);return res.end("Not found")}
- let ext=path.extname(f),ct=ext===".js"?"text/javascript":ext===".css"?"text/css":"text/html";res.writeHead(200,{"Content-Type":ct});res.end(fs.readFileSync(f));
-});
-server.listen(process.env.PORT||3000,()=>console.log("FXTRADE prototype running"));
+const http = require("http");
+const fs = require("fs");
+const path = require("path");
+
+const root = __dirname;
+
+const mime = {
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".txt": "text/plain; charset=utf-8",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".ico": "image/x-icon"
+};
+
+function handler(req, res) {
+  if (req.url === "/api/health") {
+    res.writeHead(200, {"Content-Type": "application/json"});
+    return res.end(JSON.stringify({ok: true, mode: "prototype", realMoney: false}));
+  }
+
+  let pathname = decodeURIComponent((req.url || "/").split("?")[0]);
+  if (pathname === "/") pathname = "/index.html";
+
+  // Keep this standalone version independent from Deriv.
+  // Only serve files that exist inside the project directory.
+  const file = path.resolve(root, "." + pathname);
+  if (!file.startsWith(root + path.sep) && file !== root) {
+    res.writeHead(403);
+    return res.end("Forbidden");
+  }
+
+  if (!fs.existsSync(file) || !fs.statSync(file).isFile()) {
+    res.writeHead(404, {"Content-Type": "text/plain; charset=utf-8"});
+    return res.end("FXTRADE page not found");
+  }
+
+  const ext = path.extname(file).toLowerCase();
+  res.writeHead(200, {"Content-Type": mime[ext] || "application/octet-stream"});
+  res.end(fs.readFileSync(file));
+}
+
+module.exports = handler;
+
+if (require.main === module) {
+  const server = http.createServer(handler);
+  server.listen(process.env.PORT || 3000, () => {
+    console.log("FXTRADE prototype running");
+  });
+}
