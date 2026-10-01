@@ -40,3 +40,6 @@ The dashboard now routes Demo and Real trades through the authenticated Deriv Op
 
 
 V27: If Deriv is authenticated, manual OVER and subsequent 2-digit auto OVER trades are sent through the selected Demo/Real Deriv account. Without authentication, Practice Mode remains local simulation.
+
+
+V29 change: Auto OVER requires exactly three consecutive qualifying 0–3 prediction digits before placing a trade. A 4–9 digit resets the three-digit sequence.
