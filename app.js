@@ -8,7 +8,8 @@ function save(){Object.assign(state,{balance,startBalance,wins,losses,history,tr
 function fmt(n){return (n<0?"-":"")+"$"+Math.abs(Number(n)).toFixed(2)}
 function toast(msg,bad=false){let t=document.createElement('div');t.className='toast '+(bad?'bad':'good');t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2200)}
 function render(){
- $('accountWallet')?.textContent=fmt(balance); $('accountName')?.textContent=state.displayName||'FXTRADE Demo User'; $('accountTrades')?.textContent=history.length;
+ const aw=$('accountWallet'), an=$('accountName'), at=$('accountTrades');
+ if(aw) aw.textContent=fmt(balance); if(an) an.textContent=state.displayName||'FXTRADE Demo User'; if(at) at.textContent=history.length;
  $('balance').textContent=fmt(balance);$('walletBalance').textContent=fmt(balance);const pl=balance-startBalance;$('pl').textContent=fmt(pl);$('pl').className=pl>=0?'win':'loss';
  $('wins').textContent=wins;$('losses').textContent=losses;$('winrate').textContent=(wins+losses?((wins/(wins+losses))*100).toFixed(1):0)+'%';
  $('targetView').textContent=fmt(Number($('target').value));$('stopView').textContent='-'+fmt(Number($('stop').value)).replace('-','');$('triggerCount').textContent=state.trigger;

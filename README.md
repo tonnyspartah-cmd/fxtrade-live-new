@@ -1,4 +1,4 @@
-# FXTRADE Independent v26
+# FXTRADE Independent v27.1
 
 Standalone demo trading prototype with:
 - simulated market/digits and AI-style analysis
