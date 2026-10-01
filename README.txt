@@ -1,12 +1,6 @@
-# FXTRADE Standalone Simulator
+FXTRADE Independent Prototype
 
-A fresh standalone digital-options-style simulator inspired by the workflow/UI patterns of modern binary trading platforms.
+Standalone demo only. No Deriv connection and no real-money trading.
+The AI signal is now wired to the same simulated digit stream used by the demo.
 
-IMPORTANT: This project is a simulator. It is NOT connected to Deriv, a broker, or a live market. Prices, ticks, signals and contract outcomes are simulated locally in the browser. It does not guarantee profits and should not be represented as real trading results.
-
-Files:
-- index.html
-- styles.css
-- app.js
-
-Deploy as a static site on Vercel, Netlify, GitHub Pages, etc.
+Real-money functionality would require a production backend, secure ledger, legitimate market/execution integration, payments, security, audit logs, and applicable legal/regulatory compliance.

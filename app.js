@@ -19,9 +19,15 @@ function addDigit(d){
  if(selected==="OVER" && d>Number($("barrier").value)) autoStreak++; else if(selected==="UNDER" && d<Number($("barrier").value)) autoStreak++; else if(selected==="EVEN" && d%2===0) autoStreak++; else if(selected==="ODD" && d%2===1) autoStreak++; else autoStreak=0;
  if(auto && autoStreak>=Number($("triggerCount").textContent) && Date.now()-lastTrade>1300) placeTrade(true);
 }
+function updateAISignal(){
+ const result=analyzeAISignal(digits);
+ $("signal").textContent=result.direction;
+ $("strength").textContent=result.confidence ? `${result.strength} ${result.confidence}%` : "WAIT";
+ $("pattern").textContent=result.reason || "Waiting for more tick data";
+}
 function tick(){
  price += (Math.random()-.5)*900; if(price<1000)price=1000;
- $("price").textContent=price.toFixed(2);addDigit(Math.floor(Math.random()*10));draw();
+ $("price").textContent=price.toFixed(2);addDigit(Math.floor(Math.random()*10));draw();updateAISignal();
 }
 const canvas=$("chart"),ctx=canvas.getContext("2d"),points=[];
 function draw(){points.push(price);if(points.length>70)points.shift();ctx.clearRect(0,0,canvas.width,canvas.height);let min=Math.min(...points),max=Math.max(...points),range=max-min||1;ctx.beginPath();points.forEach((p,i)=>{let x=i*(canvas.width/69),y=160-((p-min)/range)*135;i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.strokeStyle="#35d9aa";ctx.lineWidth=2;ctx.stroke()}

@@ -1,7 +1,15 @@
-# FXTRADE Independent v3
+# FXTRADE Independent Prototype
 
-Standalone architecture prototype. It has a browser UI, an independent simulated tick engine, contract rules, wallet ledger, settlement and trade history.
+This version is a standalone **demo/prototype**. It does not execute real-money trades and does not connect to Deriv.
 
-It is **play-money only**. It is not connected to Deriv, a broker, a bank, payment provider, or a live market.
+## Current architecture
+- Browser UI for market, digits, contracts, stake, P/L and history.
+- Simulated market/tick generator for testing.
+- Local demo balance and simulated settlement.
+- AI-signal module wired into the same simulated digit stream.
+- Node server with `/api/health`.
 
-For a real-money production service, licensing/compliance, a lawful market/odds source, secure server-side custody/ledger, payments, identity/age controls, auditing, responsible-gambling controls and independent security review must be completed before enabling real deposits or withdrawals.
+## Important
+The displayed signal/confidence is a prototype analysis of simulated digits, not a guarantee or prediction of real-market outcomes.
+
+For a real-money platform, the prototype would need a separate production backend, authenticated accounts, server-side ledger, market-data/execution integration, settlement controls, payment processing, security, audit logs, and applicable legal/regulatory compliance.
