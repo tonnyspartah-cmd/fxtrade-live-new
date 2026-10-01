@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>FXTRADE — Smart Digital Trading Simulator</title>
+<title>FXTRADE — Independent Trading Simulator</title>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -17,13 +17,13 @@
       <button class="nav">▣ <span>Trade History</span></button>
       <button class="nav">⚙ <span>Settings</span></button>
     </nav>
-    <div class="side-note">Deriv-connected terminal<br>Demo first • Real money only when explicitly selected.</div>
+    <div class="side-note">Independent simulation engine<br>No broker or external trading connection.</div>
   </aside>
 
   <main class="main">
     <header class="topbar">
       <div><div class="eyebrow">SMART DIGITAL TERMINAL</div><h1>Trading Dashboard</h1></div>
-      <div class="top-actions"><span id="marketState" class="pill live">● LIVE MARKET</span><button id="connectBtn" class="primary small">CONNECT DERIV</button><button id="resetBtn" class="ghost">Reset Demo</button></div>
+      <div class="top-actions"><span id="marketState" class="pill live">● LIVE MARKET</span><span class="pill">STANDALONE</span><button id="resetBtn" class="ghost">Reset Demo</button></div>
     </header>
 
     <section class="stats">
@@ -39,18 +39,18 @@
         <div class="card-head"><div><span class="eyebrow">MARKET</span><h2 id="symbolTitle">Synthetic Volatility 100</h2></div>
           <select id="market"><option>Volatility 100</option><option>Volatility 75</option><option>Volatility 50</option><option>Volatility 25</option><option>Volatility 10</option></select>
         </div>
-        <div class="price-row"><div><span class="muted">DERIV LIVE INDEX</span><div id="price" class="price">100000.00</div></div><div class="tick"><span>LAST DIGIT</span><b id="lastDigit">0</b></div></div>
+        <div class="price-row"><div><span class="muted">SYNTHETIC INDEX</span><div id="price" class="price">100000.00</div></div><div class="tick"><span>LAST DIGIT</span><b id="lastDigit">0</b></div></div>
         <canvas id="chart" height="170"></canvas>
         <div class="digits" id="digits"></div>
       </div>
 
       <div class="card scan-card">
         <div class="card-head"><div><span class="eyebrow">AI-STYLE ANALYSIS</span><h2>Deep Scan</h2></div><button id="scanBtn" class="primary small">SCAN</button></div>
-        <div class="scan-state" id="scanState"><div class="radar"></div><div><b>Ready to scan</b><p>Uses live Deriv tick data.</p></div></div>
+        <div class="scan-state" id="scanState"><div class="radar"></div><div><b>Ready to scan</b><p>Uses FXTRADE internal synthetic tick data.</p></div></div>
         <div class="signal"><span>Signal</span><strong id="signal">WAIT</strong></div>
         <div class="signal"><span>Pattern</span><strong id="pattern">Collecting ticks</strong></div>
         <div class="signal"><span>Data strength</span><strong id="strength">—</strong></div>
-        <div class="warning">Trading uses Deriv. A signal is not a guarantee of profit. Test on demo before using real funds.</div>
+        <div class="warning">This is a standalone simulation. Prices, trades and P/L are simulated and are not real-money results.</div>
       </div>
 
       <div class="card trade-card">
@@ -63,7 +63,7 @@
         <div class="quick"><button data-stake="1">$1</button><button data-stake="5">$5</button><button data-stake="10">$10</button><button data-stake="25">$25</button></div>
         <label>Barrier <div class="input-wrap"><input id="barrier" type="number" min="0" max="9" value="3"></div></label>
         <div class="row2"><label>Target Profit<div class="input-wrap">$<input id="target" type="number" value="50"></div></label><label>Stop Loss<div class="input-wrap">$<input id="stop" type="number" value="30"></div></label></div>
-        <button id="tradeBtn" class="trade-btn">PLACE DERIV TRADE</button>
+        <button id="tradeBtn" class="trade-btn">PLACE SIMULATED TRADE</button>
         <button id="autoBtn" class="stop-btn">START AUTO</button>
         <div class="rule">Auto trigger: <b id="triggerCount">3</b> consecutive matching digits.</div>
       </div>
@@ -71,7 +71,7 @@
       <div class="card activity-card">
         <div class="card-head"><div><span class="eyebrow">PERFORMANCE</span><h2>Live Activity</h2></div><button id="clearBtn" class="ghost small">Clear</button></div>
         <div class="activity-grid"><div><span>Open trade</span><b id="openTrade">None</b></div><div><span>Last result</span><b id="lastResult">—</b></div><div><span>Target</span><b id="targetView">$50</b></div><div><span>Stop</span><b id="stopView">-$30</b></div></div>
-        <div class="history" id="history"><div class="empty">No trades yet. Start with a demo trade.</div></div>
+        <div class="history" id="history"><div class="empty">No trades yet. Start with a simulated trade.</div></div>
       </div>
     </section>
   </main>

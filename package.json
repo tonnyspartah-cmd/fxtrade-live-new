@@ -1,7 +1,1 @@
-{
-  "name": "fxtrade-independent-prototype",
-  "version": "3.0.0",
-  "scripts": {
-    "start": "node server.js"
-  }
-}
+{"name":"fxtrade-independent","version":"24.0.0","private":true,"scripts":{"start":"node server.js"}}
