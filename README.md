@@ -1,7 +1,24 @@
-# FXTRADE Independent v3
+# FXTRADE — Deriv OAuth v1
 
-Standalone architecture prototype. It has a browser UI, an independent simulated tick engine, contract rules, wallet ledger, settlement and trade history.
+This version adds the official Deriv OAuth 2.0 Authorization Code flow with PKCE.
 
-It is **play-money only**. It is not connected to Deriv, a broker, a bank, payment provider, or a live market.
+Registered redirect:
+https://fxtrade-live-new.vercel.app/
 
-For a real-money production service, licensing/compliance, a lawful market/odds source, secure server-side custody/ledger, payments, identity/age controls, auditing, responsible-gambling controls and independent security review must be completed before enabling real deposits or withdrawals.
+Vercel Environment Variable:
+DERIV_CLIENT_ID = your Deriv OAuth client ID
+
+The client ID is public OAuth metadata; do not put any Deriv access token, password or PIN into the source.
+
+Flow:
+1. FXTRADE generates state + PKCE verifier.
+2. User is redirected to Deriv OAuth.
+3. Deriv returns an authorization code.
+4. `/api/oauth-token.js` exchanges the code server-side.
+5. The access token is stored in an HttpOnly cookie.
+6. `/api/deriv-account.js` reads the cookie server-side and calls Deriv.
+
+This version intentionally starts with authorization/account retrieval. Real-money order placement is not enabled until the account/contract flow is tested end-to-end.
+
+Deriv documentation:
+https://developers.deriv.com/docs/intro/oauth/

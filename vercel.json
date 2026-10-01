@@ -1,0 +1,17 @@
+{
+  "functions": {
+    "api/*.js": {
+      "runtime": "nodejs20.x"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/oauth-token",
+      "destination": "/api/oauth-token.js"
+    },
+    {
+      "source": "/api/deriv-account",
+      "destination": "/api/deriv-account.js"
+    }
+  ]
+}
