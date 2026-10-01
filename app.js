@@ -628,7 +628,7 @@ $('over').onclick=()=>{
   state.autoPatternBusy=false;
   if($('autoPattern'))$('autoPattern').checked=false;
   state.autoSide='left';
-  state.accountMode==='demo'?startDemo('left'):startDerivTrade('left');
+  (state.account && state.authWs && state.authWs.readyState===WebSocket.OPEN) ? startDerivTrade('left') : startDemo('left');
   toast('OVER placed manually — after it finishes, wait for two consecutive 0–3 digits for the next automatic OVER trade.');
 };
 $('under').onclick=()=>{state.autoPattern=false;if($('autoPattern'))$('autoPattern').checked=false;state.autoSide='right'; state.accountMode==='demo'?startDemo('right'):startDerivTrade('right')};

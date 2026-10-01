@@ -19,3 +19,6 @@ Deriv contract reports its profit. Trading can lose money; the AI signal is info
 
 Deploy the contents of this folder as the website root. Keep your existing Vercel
 /api/oauth/token server route if your OAuth exchange depends on it.
+
+
+V27: If Deriv is authenticated, manual OVER and subsequent 2-digit auto OVER trades are sent through the selected Demo/Real Deriv account. Without authentication, Practice Mode remains local simulation.

@@ -37,3 +37,6 @@ This build adds Demo/Real account mode and Deriv OAuth 2.0 account connection. D
 
 ## Trading connection update
 The dashboard now routes Demo and Real trades through the authenticated Deriv Options WebSocket. It requests a Deriv proposal, buys the returned proposal, and monitors the contract until settlement. The balance shown after connection is the selected Deriv account balance.
+
+
+V27: If Deriv is authenticated, manual OVER and subsequent 2-digit auto OVER trades are sent through the selected Demo/Real Deriv account. Without authentication, Practice Mode remains local simulation.
