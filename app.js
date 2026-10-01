@@ -8,6 +8,7 @@ function save(){Object.assign(state,{balance,startBalance,wins,losses,history,tr
 function fmt(n){return (n<0?"-":"")+"$"+Math.abs(Number(n)).toFixed(2)}
 function toast(msg,bad=false){let t=document.createElement('div');t.className='toast '+(bad?'bad':'good');t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2200)}
 function render(){
+ $('accountWallet')?.textContent=fmt(balance); $('accountName')?.textContent=state.displayName||'FXTRADE Demo User'; $('accountTrades')?.textContent=history.length;
  $('balance').textContent=fmt(balance);$('walletBalance').textContent=fmt(balance);const pl=balance-startBalance;$('pl').textContent=fmt(pl);$('pl').className=pl>=0?'win':'loss';
  $('wins').textContent=wins;$('losses').textContent=losses;$('winrate').textContent=(wins+losses?((wins/(wins+losses))*100).toFixed(1):0)+'%';
  $('targetView').textContent=fmt(Number($('target').value));$('stopView').textContent='-'+fmt(Number($('stop').value)).replace('-','');$('triggerCount').textContent=state.trigger;
@@ -34,3 +35,6 @@ $('clearBtn').onclick=()=>{history=[];render()};$('clearTradesPage').onclick=()=
 $('saveSettings').onclick=()=>{state.trigger=Math.max(1,Math.min(9,Number($('triggerInput').value)||3));state.displayName=$('displayName').value.trim()||'FXTRADE Demo User';save();render();toast('Settings saved')};
 $('resetBtn').onclick=()=>{balance=1000;startBalance=1000;wins=losses=0;history=[];transactions=[];digits=[];state.trigger=3;state.displayName='FXTRADE Demo User';$('displayName').value=state.displayName;$('triggerInput').value=3;render();toast('Demo account reset')};
 $('displayName').value=state.displayName;$('triggerInput').value=state.trigger;render();setInterval(tick,700);
+
+
+document.querySelectorAll('.account-jump').forEach(b=>b.onclick=()=>showSection(b.dataset.jump));

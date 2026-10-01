@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>FXTRADE — Independent Trading Simulator</title>
+<title>FXTRADE — Independent Trading Simulator v27</title>
 <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
@@ -23,8 +23,10 @@
   <main class="main">
     <header class="topbar">
       <div><div class="eyebrow">SMART DIGITAL TERMINAL</div><h1>Trading Dashboard</h1></div>
-      <div class="top-actions"><span id="marketState" class="pill live">● LIVE SIM</span><button id="resetBtn" class="ghost">Reset Demo</button></div>
+      <div class="top-actions"><span class="pill live">● LIVE SIM</span><button class="ghost account-jump" data-jump="wallet">Wallet</button><button class="ghost account-jump" data-jump="trades">History</button><button id="resetBtn" class="ghost">Reset Demo</button></div>
     </header>
+
+    <div class="account-strip"><div><span>ACCOUNT</span><b id="accountName">FXTRADE Demo User</b></div><div><span>WALLET</span><b id="accountWallet">$1,000.00</b></div><div><span>TRADES</span><b id="accountTrades">0</b></div><button class="primary small account-jump" data-jump="wallet">MANAGE WALLET</button></div>
 
     <section class="stats">
       <div class="stat"><span>Demo Balance</span><strong id="balance">$1,000.00</strong></div>
