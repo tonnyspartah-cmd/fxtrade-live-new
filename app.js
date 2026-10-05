@@ -10,7 +10,7 @@ const $ = id => {
 };
 
 const state = {
-  ws:null, publicSocket:null, reconnect:null, noTickTimer:null, publicFeedIndex:0, symbol:'1HZ100V',
+  ws:null, publicSocket:null, reconnect:null, noTickTimer:null, publicFeedIndex:0, lastTickAt:0, symbol:'1HZ100V',
   prices:[], digits:Array(10).fill(0), stake:1, stopLoss:999,
   targetProfit:3, sessionNet:0, tradingLocked:false,
   contract:'OVERUNDER', accountType:'demo', balance:10000,
@@ -54,7 +54,7 @@ function readRisk(){state.stopLoss=Math.max(0,Number($('stopLoss').value)||0);st
 function updateStopButton(){
   const b=$('stopTrade');
   if(!b)return;
-  b.textContent=state.userStopped?'▶ RESUME':'▶ RESUME';
+  b.textContent=state.userStopped?'▶ RESUME':'■ STOP';
   b.classList.toggle('stopped',state.userStopped);
 }
 function riskUpdate(){
@@ -269,28 +269,46 @@ function connectPublic(){
   const feed=PUBLIC_FEEDS[state.publicFeedIndex]||PUBLIC_FEEDS[0];
   setConnection('CONNECTING…');
   const ws=new WebSocket(feed);state.publicSocket=ws;let opened=false;
-  ws.onopen=()=>{opened=true;setConnection('LIVE',true);subscribePublic(ws); clearTimeout(state.noTickTimer); state.noTickTimer=setTimeout(()=>{if(state.prices.length===0 && state.publicSocket===ws){ if(state.publicFeedIndex<PUBLIC_FEEDS.length-1){state.publicFeedIndex++;try{ws.close()}catch{};setTimeout(connectPublic,150)}else setConnection('LIVE — waiting for ticks',false);}},5000)};
-  ws.onmessage=e=>{try{const d=JSON.parse(e.data);
-    if(d.error){
-      const req=d.req_id;
-      if((req===2||req===3||String(req).startsWith('900')) && state.publicFeedIndex<PUBLIC_FEEDS.length-1){
-        state.publicFeedIndex++; try{ws.close()}catch{}; setConnection('Switching market feed…'); setTimeout(connectPublic,150); return;
+  ws.onopen=()=>{opened=true;setConnection('CONNECTED — waiting for ticks',true);subscribePublic(ws); clearTimeout(state.noTickTimer); state.noTickTimer=setTimeout(()=>{if(state.publicSocket===ws && !state.lastTickAt){ if(state.publicFeedIndex<PUBLIC_FEEDS.length-1){state.publicFeedIndex++;try{ws.close()}catch{};setConnection('Switching market feed…');setTimeout(connectPublic,150)}else setConnection('CONNECTED — no tick stream',false);}},4500)};
+  ws.onmessage=e=>{try{
+    const d=JSON.parse(e.data);
+    if(d.msg_type==='tick' || d.data?.msg_type==='tick') state.lastTickAt=Date.now();
+    // Deriv has two public market-data WebSocket generations. Some responses from the
+    // newer endpoint use an errors array rather than the legacy top-level error field.
+    const hasError=!!d.error || (Array.isArray(d.errors)&&d.errors.length>0);
+    if(hasError){
+      const req=d.req_id ?? d.echo_req?.req_id;
+      const detail=d.error?.message || d.errors?.[0]?.message || 'Deriv market-data request failed.';
+      console.warn('Deriv public feed error:', detail, d);
+      if((req===2||req===3||String(req).startsWith('900')||!req) && state.publicFeedIndex<PUBLIC_FEEDS.length-1){
+        state.publicFeedIndex++;
+        try{ws.close()}catch{}
+        setConnection('Switching market feed…');
+        clearTimeout(state.noTickTimer);
+        setTimeout(connectPublic,150);
       }
+      if(state.publicFeedIndex>=PUBLIC_FEEDS.length-1) setConnection('MARKET DATA ERROR',false);
       return;
     }
-    if(d.msg_type==='tick'&&d.tick)onTick(d.tick);
-    if(d.msg_type==='history'&&d.history?.prices){
-      if(handleScanHistory(d))return;
-      state.prices=d.history.prices.map(Number).filter(Number.isFinite).slice(-120);
+    // Support both legacy and current response envelopes.
+    const msgType=d.msg_type||d.data?.msg_type;
+    const tick=d.tick||d.data?.tick;
+    const history=d.history||d.data?.history;
+    const active=d.active_symbols||d.data?.active_symbols;
+    if(msgType==='tick'&&tick)onTick(tick);
+    if(msgType==='history'&&history?.prices){
+      const normalized={...d,msg_type:'history',history};
+      if(handleScanHistory(normalized))return;
+      state.prices=history.prices.map(Number).filter(Number.isFinite).slice(-120);
       if(ui.tickCount)ui.tickCount.textContent=state.prices.length;
       state.digits=Array(10).fill(0);
       state.prices.forEach(v=>{const z=lastDigit(v);if(z!==null)state.digits[z]++});
       analyze(); startDeepScan();
     }
-    if(d.msg_type==='active_symbols'&&Array.isArray(d.active_symbols))populateMarkets(d.active_symbols);
-  }catch{}};
-  ws.onerror=()=>{if(!opened){if(state.publicFeedIndex<PUBLIC_FEEDS.length-1){state.publicFeedIndex++;try{ws.close()}catch{};setTimeout(connectPublic,150)}else setConnection('CONNECTION ERROR')}};
-  ws.onclose=()=>{if(opened){setConnection('RECONNECTING…');clearTimeout(state.reconnect);state.reconnect=setTimeout(connectPublic,3000)}else if(state.publicFeedIndex<PUBLIC_FEEDS.length-1){setTimeout(connectPublic,150)}else{setConnection('RECONNECTING…');clearTimeout(state.reconnect);state.reconnect=setTimeout(connectPublic,3000)}};
+    if(msgType==='active_symbols'&&Array.isArray(active))populateMarkets(active);
+  }catch(err){console.warn('Public feed message error',err)}};
+  ws.onerror=()=>{console.warn('Deriv WebSocket error on',feed);if(!opened){if(state.publicFeedIndex<PUBLIC_FEEDS.length-1){state.publicFeedIndex++;try{ws.close()}catch{};setTimeout(connectPublic,150)}else setConnection('CONNECTION ERROR')}};
+  ws.onclose=()=>{clearTimeout(state.noTickTimer);if(opened){setConnection('RECONNECTING…');clearTimeout(state.reconnect);state.reconnect=setTimeout(connectPublic,3000)}else if(state.publicFeedIndex<PUBLIC_FEEDS.length-1){setTimeout(connectPublic,150)}else{setConnection('RECONNECTING…');clearTimeout(state.reconnect);state.reconnect=setTimeout(connectPublic,3000)}};
 }
 function populateMarkets(items){
   const merged=new Map(fallback.map(x=>[x[0],x[1]]));
