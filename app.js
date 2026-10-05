@@ -21,7 +21,7 @@ const state = {
 
 const DERIV_CLIENT_ID='34m6kBZ1JQGXBHSscpXXQ';
 const DERIV_API='https://api.derivws.com';
-const PUBLIC_FEEDS=['wss://ws.binaryws.com/websockets/v3','wss://api.derivws.com/trading/v1/options/ws/public'];
+const PUBLIC_FEEDS=['wss://api.derivws.com/trading/v1/options/ws/public','wss://ws.binaryws.com/websockets/v3'];
 const REDIRECT_URI=window.location.origin+'/';
 const auth={token:sessionStorage.getItem('deriv_access_token')||null};
 
@@ -190,13 +190,17 @@ function renderDeepScan(result, scanning=false){
 function startDeepScan(){
   if(!state.publicSocket || state.publicSocket.readyState!==1 || !ui.scanVolatility)return;
   clearTimeout(state.scanTimer);
-  const symbols=fallback.filter(([sym])=>/1HZ/.test(sym)).slice(0,9).map(x=>x[0]);
+  const symbols=fallback.filter(([sym])=>/1HZ/.test(sym)).slice(0,5).map(x=>x[0]);
   const seq=++state.scanSeq; state.scanResults=new Map();
   renderDeepScan(null,true);
   symbols.forEach((symbol,index)=>{
     const reqId=900000+seq*100+index;
     state.scanResults.set(reqId,{symbol});
-    state.publicSocket.send(JSON.stringify({ticks_history:symbol,count:60,end:'latest',style:'ticks',req_id:reqId}));
+    setTimeout(()=>{
+      if(state.publicSocket && state.publicSocket.readyState===1 && seq===state.scanSeq){
+        state.publicSocket.send(JSON.stringify({ticks_history:symbol,count:60,end:'latest',style:'ticks',req_id:reqId}));
+      }
+    }, index*120);
   });
   state.scanTimer=setTimeout(()=>finishDeepScan(seq),2200);
 }

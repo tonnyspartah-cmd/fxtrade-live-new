@@ -160,3 +160,11 @@ html,body{overflow-x:hidden;overflow-y:auto}
 
 /* Match the reference mobile trading arrangement: OVER | STAKE/RISK | UNDER */
 @media(max-width:760px){.trade-panel .stake-box{order:initial}.trade-panel{align-items:start}}
+
+/* Final mobile order: OVER | STAKE/RISK | UNDER */
+@media (max-width:760px){
+  .trade-panel{display:grid!important;grid-template-columns:minmax(0,1fr) 145px minmax(0,1fr)!important;align-items:start!important}
+  .trade-panel .over-side{order:1!important}
+  .trade-panel .stake-box{order:2!important}
+  .trade-panel .under-side{order:3!important}
+}
