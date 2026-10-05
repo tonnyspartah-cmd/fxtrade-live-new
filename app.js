@@ -10,7 +10,7 @@ const $ = id => {
 };
 
 const state = {
-  ws:null, publicSocket:null, reconnect:null, publicFeedIndex:0, symbol:'1HZ100V',
+  ws:null, publicSocket:null, reconnect:null, noTickTimer:null, publicFeedIndex:0, symbol:'1HZ100V',
   prices:[], digits:Array(10).fill(0), stake:1, stopLoss:999,
   targetProfit:3, sessionNet:0, tradingLocked:false,
   contract:'OVERUNDER', accountType:'demo', balance:10000,
@@ -21,7 +21,7 @@ const state = {
 
 const DERIV_CLIENT_ID='34m6kBZ1JQGXBHSscpXXQ';
 const DERIV_API='https://api.derivws.com';
-const PUBLIC_FEEDS=['wss://api.derivws.com/trading/v1/options/ws/public','wss://ws.binaryws.com/websockets/v3'];
+const PUBLIC_FEEDS=['wss://ws.binaryws.com/websockets/v3','wss://api.derivws.com/trading/v1/options/ws/public'];
 const REDIRECT_URI=window.location.origin+'/';
 const auth={token:sessionStorage.getItem('deriv_access_token')||null};
 
@@ -257,7 +257,7 @@ function onTick(t){
 function subscribePublic(ws){
   ws.send(JSON.stringify({active_symbols:'brief',product_type:'basic',req_id:1}));
   ws.send(JSON.stringify({ticks:state.symbol,subscribe:1,req_id:2}));
-  ws.send(JSON.stringify({ticks_history:state.symbol,count:80,end:'latest',style:'ticks',req_id:3}));
+  ws.send(JSON.stringify({ticks_history:state.symbol,count:120,end:'latest',style:'ticks',req_id:3}));
 }
 function connectPublic(){
   try{state.publicSocket?.close()}catch{}
@@ -265,8 +265,26 @@ function connectPublic(){
   const feed=PUBLIC_FEEDS[state.publicFeedIndex]||PUBLIC_FEEDS[0];
   setConnection('CONNECTING…');
   const ws=new WebSocket(feed);state.publicSocket=ws;let opened=false;
-  ws.onopen=()=>{opened=true;setConnection('LIVE',true);subscribePublic(ws)};
-  ws.onmessage=e=>{try{const d=JSON.parse(e.data);if(d.msg_type==='tick'&&d.tick)onTick(d.tick);if(d.msg_type==='history'&&d.history?.prices){if(handleScanHistory(d))return;state.prices=d.history.prices.map(Number).filter(Number.isFinite).slice(-120);if(ui.tickCount)ui.tickCount.textContent=state.prices.length;state.digits=Array(10).fill(0);state.prices.forEach(v=>{const z=lastDigit(v);if(z!==null)state.digits[z]++});analyze();startDeepScan()}if(d.msg_type==='active_symbols'&&Array.isArray(d.active_symbols))populateMarkets(d.active_symbols)}catch{}};
+  ws.onopen=()=>{opened=true;setConnection('LIVE',true);subscribePublic(ws); clearTimeout(state.noTickTimer); state.noTickTimer=setTimeout(()=>{if(state.prices.length===0 && state.publicSocket===ws){ if(state.publicFeedIndex<PUBLIC_FEEDS.length-1){state.publicFeedIndex++;try{ws.close()}catch{};setTimeout(connectPublic,150)}else setConnection('LIVE — waiting for ticks',false);}},5000)};
+  ws.onmessage=e=>{try{const d=JSON.parse(e.data);
+    if(d.error){
+      const req=d.req_id;
+      if((req===2||req===3||String(req).startsWith('900')) && state.publicFeedIndex<PUBLIC_FEEDS.length-1){
+        state.publicFeedIndex++; try{ws.close()}catch{}; setConnection('Switching market feed…'); setTimeout(connectPublic,150); return;
+      }
+      return;
+    }
+    if(d.msg_type==='tick'&&d.tick)onTick(d.tick);
+    if(d.msg_type==='history'&&d.history?.prices){
+      if(handleScanHistory(d))return;
+      state.prices=d.history.prices.map(Number).filter(Number.isFinite).slice(-120);
+      if(ui.tickCount)ui.tickCount.textContent=state.prices.length;
+      state.digits=Array(10).fill(0);
+      state.prices.forEach(v=>{const z=lastDigit(v);if(z!==null)state.digits[z]++});
+      analyze(); startDeepScan();
+    }
+    if(d.msg_type==='active_symbols'&&Array.isArray(d.active_symbols))populateMarkets(d.active_symbols);
+  }catch{}};
   ws.onerror=()=>{if(!opened){if(state.publicFeedIndex<PUBLIC_FEEDS.length-1){state.publicFeedIndex++;try{ws.close()}catch{};setTimeout(connectPublic,150)}else setConnection('CONNECTION ERROR')}};
   ws.onclose=()=>{if(opened){setConnection('RECONNECTING…');clearTimeout(state.reconnect);state.reconnect=setTimeout(connectPublic,3000)}else if(state.publicFeedIndex<PUBLIC_FEEDS.length-1){setTimeout(connectPublic,150)}else{setConnection('RECONNECTING…');clearTimeout(state.reconnect);state.reconnect=setTimeout(connectPublic,3000)}};
 }

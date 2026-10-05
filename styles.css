@@ -157,3 +157,6 @@ html,body{overflow-x:hidden;overflow-y:auto}
   .status-row{padding:0 10px 6px;font-size:9px}
   footer{display:flex;padding:4px 10px 14px;font-size:9px}
 }
+
+/* Match the reference mobile trading arrangement: OVER | STAKE/RISK | UNDER */
+@media(max-width:760px){.trade-panel .stake-box{order:initial}.trade-panel{align-items:start}}
