@@ -75,10 +75,16 @@
         </div>
 
         <div class="card scan-card">
-          <div class="card-head"><div><span class="eyebrow">AI-STYLE ANALYSIS</span><h2>Deep Scan</h2></div><button id="scanBtn" class="primary small">SCAN</button></div>
-          <div class="scan-state" id="scanState"><div class="radar"></div><div><b>Ready to scan</b><p>Uses the simulated tick stream only.</p></div></div>
-          <div class="signal"><span>Signal</span><strong id="signal">WAIT</strong></div><div class="signal"><span>Pattern</span><strong id="pattern">Collecting ticks</strong></div><div class="signal"><span>Data strength</span><strong id="strength">—</strong></div>
-          <div class="warning">Simulation only. No real market prediction or guaranteed profit.</div>
+          <div class="card-head"><div><span class="eyebrow">FXTRADE ANALYSIS</span><h2>Deep Scan</h2></div><button id="scanBtn" class="primary small">SCAN</button></div>
+          <div class="scan-state" id="scanState"><div class="radar"></div><div><b>Ready to scan</b><p>Scan volatility + market conditions.</p></div></div>
+          <div class="signal"><span>Recommended Volatility</span><strong id="scanVolatility">—</strong></div>
+          <div class="signal"><span>Contract</span><strong id="signal">WAIT</strong></div>
+          <div class="signal"><span>Confidence</span><strong id="scanConfidence">—</strong></div>
+          <div class="signal"><span>Market</span><strong id="scanMarket">Waiting for scan</strong></div>
+          <div class="signal"><span>Prediction Digit</span><strong id="scanDigit">—</strong></div>
+          <div class="signal"><span>Data strength</span><strong id="strength">—</strong></div>
+          <div class="scan-action" id="scanAction">Action: WAIT</div>
+          <div class="warning">Statistical analysis only. No signal guarantees a winning trade.</div>
         </div>
 
         <div class="card trade-card">
