@@ -368,7 +368,6 @@ function contractRequest(side){
   return{contract_type:side==='left'?'CALL':'PUT'}
 }
 function placeTrade(side, fromAuto=false){
-  if(!fromAuto){ state.autoRunning=false; state.autoSide=null; clearTimeout(state.autoTimer); state.autoTimer=null; }
   readRisk();riskUpdate();if(state.tradingLocked)return;
   if(!auth.token||!state.ws||!state.authenticated){toast('Connect Deriv before trading.');return}
   if(state.waitingForProposal){toast('Please wait for the previous trade request.');return}
@@ -420,13 +419,13 @@ function stopAutoTrade(){
   riskUpdate();
   toast('Trading stopped.');
 }
-$('over').onclick=()=>placeTrade('left',false);
-$('under').onclick=()=>placeTrade('right',false);
+$('over').onclick=()=>startAutoTrade('left');
+$('under').onclick=()=>startAutoTrade('right');
 $('stopTrade').onclick=()=>{
   if(state.autoRunning || !state.userStopped) stopAutoTrade();
   else { state.userStopped=false; state.tradingLocked=false; riskUpdate(); toast('Ready to trade.'); }
 };
-$('place').onclick=()=>{if(!state.signalReady){toast('Signal filter says WAIT — no trade placed.');return}const s=ui.direction.textContent;if(['MATCH','OVER','RISE','EVEN'].includes(s))placeTrade('left',false);else if(['DIFFER','UNDER','FALL','ODD'].includes(s))placeTrade('right',false);else toast('AI says WAIT — no trade placed.')};
+$('place').onclick=()=>{if(!state.signalReady){toast('Signal filter says WAIT — no trade placed.');return}const s=ui.direction.textContent;if(['MATCH','OVER','RISE','EVEN'].includes(s))startAutoTrade('left');else if(['DIFFER','UNDER','FALL','ODD'].includes(s))startAutoTrade('right');else toast('AI says WAIT — no trade placed.')};
 $('reset').onclick=()=>{if(state.accountType==='real'){toast('Real balance cannot be reset.');return}state.sessionNet=0;state.userStopped=false;state.wins=0;state.losses=0;state.tradingLocked=false;ui.wins.textContent='0 W';ui.losses.textContent='0 L';riskUpdate();toast('Session reset.')};
 $('autoMode').onclick=()=>{state.manual=false;$('autoMode').classList.add('selected');$('manualMode').classList.remove('selected')};
 $('manualMode').onclick=()=>{state.manual=true;$('manualMode').classList.add('selected');$('autoMode').classList.remove('selected')};
