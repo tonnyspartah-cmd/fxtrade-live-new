@@ -82,6 +82,15 @@
         <div class="strongest">Strongest Digit <strong id="strongestDigit">—</strong> <em id="strongestPct">—</em></div>
       </div>
       <div class="digit-grid" id="digitGrid"></div>
+      <div class="digit-note">Percentages are calculated from the live Deriv tick sample.</div>
+    </section>
+
+    <section class="panel chart-panel">
+      <div class="chart-head">
+        <h2>Live Market</h2>
+        <small><span id="tickCount">0</span> ticks</small>
+      </div>
+      <div class="chart-wrap"><canvas id="chart" aria-label="Live market chart"></canvas></div>
     </section>
 
     <section class="trade-panel">
@@ -90,21 +99,35 @@
         <small id="leftRule">Digits 4 - 9</small>
       </div>
       <div class="stake-box">
-        <label>Stake (USD)</label>
-        <div class="stake-control"><button data-delta="-1">−</button><strong id="stake">5</strong><button data-delta="1">+</button></div>
-        <div class="presets"><button data-stake="5">$5</button><button data-stake="10">$10</button><button data-stake="20">$20</button><button data-stake="50">$50</button></div>
-        <div class="payout">Potential payout <strong id="payout">$9.80</strong></div>
-        <div class="risk-controls">
-          <label>Stop Loss (USD)</label><input id="stopLoss" type="number" min="0" step="0.01" value="0" placeholder="0 = off">
-          <label>Target Profit (USD)</label><input id="targetProfit" type="number" min="0" step="0.01" value="0" placeholder="0 = off">
-          <small id="riskStatus">Risk limits active</small>
+        <label>STAKE</label>
+        <div class="stake-control"><button data-delta="-1">−</button><strong id="stake">1.00</strong><button data-delta="1">+</button></div>
+        <div class="presets"><button data-stake="0.25">$0.25</button><button data-stake="1">$1</button><button data-stake="5">$5</button><button data-stake="10">$10</button></div>
+        <div class="risk-grid">
+          <label>Target Profit<input id="targetProfit" type="number" min="0" step="0.01" value="0" placeholder="0"></label>
+          <label>Stop Loss<input id="stopLoss" type="number" min="0" step="0.01" value="0" placeholder="0"></label>
         </div>
+        <div class="session-pnl">
+          <span>P/L (SESSION)</span><strong id="sessionNet">+$0.00</strong>
+        </div>
+        <div class="winloss"><span>WINS / LOSSES</span><strong><b id="wins">0 W</b> - <em id="losses">0 L</em></strong></div>
+        <small id="riskStatus">Risk limits active</small>
         <button id="place" class="place">Place Demo Trade</button>
       </div>
       <div class="trade-side under-side">
         <button id="under" class="trade under">↓ <span id="rightTradeLabel">UNDER</span></button>
         <small id="rightRule">Digits 0 - 3</small>
       </div>
+    </section>
+
+    <section class="auto-row">
+      <label class="auto-toggle"><input id="autoMode" type="checkbox"><span>2-Digit<br><b>Auto Over</b></span></label>
+      <div class="auto-rule">(2 consecutive 0–3 digits = 1 trade,<br>then wait for a new pair)</div>
+      <button id="stopTrade" class="stop-button">▶ RESUME</button>
+      <button id="manualMode" class="hidden-control" type="button">Manual</button>
+      <select id="accountType" class="hidden-control"><option value="demo">Demo</option><option value="real">Real</option></select>
+      <button id="connectDeriv" class="hidden-control" type="button">Connect Deriv</button>
+      <span id="accountLabel" class="hidden-control">Demo Account</span>
+      <input id="multiplier" class="hidden-control" value="2">
     </section>
 
     <div class="status-row"><span id="connection">● Connecting…</span><button id="analyze">Analyze</button></div>

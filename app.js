@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const __fxHidden = new Set(['accountLabel','accountType','autoMode','connectDeriv','losses','manualMode','multiplier','sessionNet','signalText','stopTrade','wins','chart','riskStatus']);
+const __fxHidden = new Set(['accountLabel','accountType','connectDeriv','losses','manualMode','multiplier','signalText']);
 const $ = id => {
   const found = document.getElementById(id);
   if(found) return found;
@@ -16,7 +16,7 @@ const state = {
   contract:'OVERUNDER', accountType:'demo', balance:10000,
   currency:'USD', authenticated:false, accountId:null,
   waitingForProposal:null, proposalReqId:0, buyReqId:0, contractReqId:0,
-  wins:0, losses:0, manual:false, multiplier:2, userStopped:false, autoRunning:false, autoSide:null, autoTimer:null, signalReady:false, signalScore:0, scanSeq:0, scanResults:new Map(), scanTimer:null
+  wins:0, losses:0, manual:false, multiplier:2, userStopped:false, autoRunning:false, autoSide:null, autoTimer:null, signalReady:false, signalScore:0, scanSeq:0, scanResults:new Map(), scanTimer:null, lowDigitStreak:0, autoPairUsed:false
 };
 
 const DERIV_CLIENT_ID='34m6kBZ1JQGXBHSscpXXQ';
@@ -33,7 +33,7 @@ const ui={
   leftLabel:$('leftTradeLabel'), rightLabel:$('rightTradeLabel'),
   leftRule:$('leftRule'), rightRule:$('rightRule'),
   wins:$('wins'), losses:$('losses'), sessionNet:$('sessionNet'),
-  signalText:$('signalText'), riskStatus:$('riskStatus'), chart:$('chart'),
+  signalText:$('signalText'), riskStatus:$('riskStatus'), chart:$('chart'), tickCount:$('tickCount'), autoMode:$('autoMode'), stopTrade:$('stopTrade'),
   scanVolatility:$('scanVolatility'), scanContract:$('scanContract'), scanMarket:$('scanMarket'), scanPrediction:$('scanPrediction'), scanStrength:$('scanStrength')
 };
 
@@ -54,7 +54,7 @@ function readRisk(){state.stopLoss=Math.max(0,Number($('stopLoss').value)||0);st
 function updateStopButton(){
   const b=$('stopTrade');
   if(!b)return;
-  b.textContent=state.userStopped?'▶ START':'■ STOP';
+  b.textContent=state.userStopped?'▶ RESUME':'▶ RESUME';
   b.classList.toggle('stopped',state.userStopped);
 }
 function riskUpdate(){
@@ -239,8 +239,17 @@ function analyze(){
 function onTick(t){
   const q=Number(t.quote);if(!Number.isFinite(q))return;
   state.prices.push(q);if(state.prices.length>120)state.prices.shift();
-  const d=lastDigit(q);if(d!==null)state.digits[d]++;
-  ui.price.textContent=fmt(q);analyze(); if(state.prices.length%8===0)startDeepScan();
+  const d=lastDigit(q);if(d!==null){
+    state.digits[d]++;
+    if(ui.autoMode?.checked){
+      if(d>=0&&d<=3){state.lowDigitStreak++;}
+      else {state.lowDigitStreak=0;state.autoPairUsed=false;}
+      if(state.lowDigitStreak>=2&&!state.autoPairUsed&&!state.tradingLocked){
+        state.autoPairUsed=true;state.lowDigitStreak=0;startAutoTrade('left');
+      }
+    }
+  }
+  ui.price.textContent=fmt(q); if(ui.tickCount)ui.tickCount.textContent=state.prices.length; analyze(); if(state.prices.length%8===0)startDeepScan();
 }
 
 function subscribePublic(ws){
@@ -252,7 +261,7 @@ function connectPublic(){
   try{state.publicSocket?.close()}catch{}
   setConnection('CONNECTING…');const ws=new WebSocket(PUBLIC_WS);state.publicSocket=ws;let opened=false;
   ws.onopen=()=>{opened=true;setConnection('LIVE',true);subscribePublic(ws)};
-  ws.onmessage=e=>{try{const d=JSON.parse(e.data);if(d.msg_type==='tick'&&d.tick)onTick(d.tick);if(d.msg_type==='history'&&d.history?.prices){if(handleScanHistory(d))return;state.prices=d.history.prices.map(Number).filter(Number.isFinite).slice(-120);state.digits=Array(10).fill(0);state.prices.forEach(v=>{const z=lastDigit(v);if(z!==null)state.digits[z]++});analyze();startDeepScan()}if(d.msg_type==='active_symbols'&&Array.isArray(d.active_symbols))populateMarkets(d.active_symbols)}catch{}};
+  ws.onmessage=e=>{try{const d=JSON.parse(e.data);if(d.msg_type==='tick'&&d.tick)onTick(d.tick);if(d.msg_type==='history'&&d.history?.prices){if(handleScanHistory(d))return;state.prices=d.history.prices.map(Number).filter(Number.isFinite).slice(-120);if(ui.tickCount)ui.tickCount.textContent=state.prices.length;state.digits=Array(10).fill(0);state.prices.forEach(v=>{const z=lastDigit(v);if(z!==null)state.digits[z]++});analyze();startDeepScan()}if(d.msg_type==='active_symbols'&&Array.isArray(d.active_symbols))populateMarkets(d.active_symbols)}catch{}};
   ws.onerror=()=>{if(!opened)setConnection('CONNECTION ERROR')};
   ws.onclose=()=>{setConnection('RECONNECTING…');clearTimeout(state.reconnect);state.reconnect=setTimeout(connectPublic,3000)};
 }
@@ -377,7 +386,8 @@ $('autoMode').onclick=()=>{state.manual=false;$('autoMode').classList.add('selec
 $('manualMode').onclick=()=>{state.manual=true;$('manualMode').classList.add('selected');$('autoMode').classList.remove('selected')};
 $('connectDeriv').onclick=()=>auth.token?loadAccounts():startOAuth();
 $('accountType').onchange=async e=>{state.accountType=e.target.value;sessionStorage.setItem('deriv_account_type',state.accountType);if(auth.token)await connectSelectedAccount();else{$('accountType').value='demo';state.accountType='demo';toast('Connect Deriv first.')}};
-$('market').onchange=e=>{state.symbol=e.target.value;state.prices=[];state.digits=Array(10).fill(0);connectPublic()};
+$('autoMode').onchange=e=>{state.lowDigitStreak=0;state.autoPairUsed=false;if(e.target.checked){toast('2-Digit Auto Over armed.')}else{state.autoRunning=false;state.autoSide=null;clearTimeout(state.autoTimer);toast('2-Digit Auto Over off.')}};
+$('market').onchange=e=>{state.symbol=e.target.value;state.prices=[];state.digits=Array(10).fill(0);if(ui.tickCount)ui.tickCount.textContent='0';connectPublic()};
 $('stopLoss').oninput=riskUpdate;$('targetProfit').oninput=riskUpdate;$('multiplier').onchange=readRisk;
 window.addEventListener('resize',drawChart);
 
