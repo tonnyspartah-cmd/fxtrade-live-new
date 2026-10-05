@@ -1,4 +1,4 @@
-# FXTRADE Independent v28
+# FXTRADE Smart Digital Terminal v29
 
 Sandbox account and server-wallet architecture.
 
