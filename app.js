@@ -13,7 +13,7 @@ const state = {
   ws:null, publicSocket:null, reconnect:null, symbol:'1HZ100V',
   prices:[], digits:Array(10).fill(0), stake:1, stopLoss:999,
   targetProfit:3, sessionNet:0, tradingLocked:false,
-  contract:'MATCHDIFF', accountType:'demo', balance:10000,
+  contract:'OVERUNDER', accountType:'demo', balance:10000,
   currency:'USD', authenticated:false, accountId:null,
   waitingForProposal:null, proposalReqId:0, buyReqId:0, contractReqId:0,
   wins:0, losses:0, manual:false, multiplier:2, userStopped:false, autoRunning:false, autoSide:null, autoTimer:null, signalReady:false, signalScore:0, scanSeq:0, scanResults:new Map(), scanTimer:null
@@ -26,7 +26,7 @@ const REDIRECT_URI=window.location.origin+'/';
 const auth={token:sessionStorage.getItem('deriv_access_token')||null};
 
 const ui={
-  price:$('price'), digitGrid:$('digitGrid'), balance:$('balance'),
+  price:$('price'), digitGrid:$('digitGrid'), digitBig:$('digitBig'), strongestDigit:$('strongestDigit'), strongestPct:$('strongestPct'), balance:$('balance'),
   direction:$('direction'), confidence:$('confidence'), connection:$('connection'),
   payout:$('payout'), stake:$('stake'), connect:$('connectDeriv'),
   accountType:$('accountType'), accountLabel:$('accountLabel'),
@@ -115,6 +115,9 @@ function updateDigits(){
   const probs=state.digits.map(n=>n/total*100),hi=probs.indexOf(Math.max(...probs));
   const current=state.prices.length?lastDigit(state.prices.at(-1)):null;
   ui.digitGrid.innerHTML=probs.map((v,i)=>`<div class="digit ${i===hi?'high':''}"><b>${i}</b><small>${v.toFixed(1)}%</small></div>`).join('');
+  if(ui.digitBig)ui.digitBig.textContent=Number.isInteger(current)?current:'—';
+  if(ui.strongestDigit)ui.strongestDigit.textContent=hi;
+  if(ui.strongestPct)ui.strongestPct.textContent='('+probs[hi].toFixed(1)+'%)';
   if(Number.isInteger(current)){const cursor=document.createElement('div');cursor.className='digit-cursor';cursor.style.left=((current+.5)*10)+'%';ui.digitGrid.appendChild(cursor)}
   return {probs,hi,current};
 }
@@ -175,7 +178,7 @@ function renderDeepScan(result, scanning=false){
     ui.scanMarket.textContent='Not enough data'; ui.scanPrediction.textContent='—'; ui.scanStrength.textContent='Weak'; return;
   }
   ui.direction.textContent=result.direction;
-  ui.confidence.textContent=result.confidence+'/100';
+  ui.confidence.textContent=result.direction==='WAIT'?'—':result.confidence+'/100';
   ui.scanVolatility.textContent=scanMarketLabel(result.symbol);
   ui.scanContract.textContent=result.contract;
   ui.scanMarket.textContent=result.market;
@@ -193,7 +196,7 @@ function startDeepScan(){
     state.scanResults.set(reqId,{symbol});
     state.publicSocket.send(JSON.stringify({ticks_history:symbol,count:60,end:'latest',style:'ticks',req_id:reqId}));
   });
-  state.scanTimer=setTimeout(()=>finishDeepScan(seq),1800);
+  state.scanTimer=setTimeout(()=>finishDeepScan(seq),2200);
 }
 function finishDeepScan(seq){
   if(seq!==state.scanSeq)return;
@@ -228,11 +231,8 @@ function analyze(){
   const filtered=signalFilter(info);
   state.signalScore=filtered.score;
   state.signalReady=filtered.ready;
-  const baseConf=55+Math.min(40,Math.abs(delta/Math.max(a,1))*100000*6);
-  const conf=filtered.ready?Math.max(55,Math.min(95,Math.round(baseConf))):Math.min(69,Math.max(50,Math.round(50+filtered.score/5)));
-  ui.direction.textContent=dir;ui.confidence.textContent=conf+'%';
-  text=dir==='WAIT'?'No strong direction yet.':`Live ${state.contract==='MATCHDIFF'?'digit': 'market'} signal: ${dir}.`;
-  ui.signalText.textContent=filtered.ready?text+' Filter: STRONG.':text+' Filter: WAIT — '+filtered.reason;
+  // The AI DEEP SCAN card is rendered only by the multi-volatility scanner.
+  // Do not overwrite its recommendation on every incoming tick.
   drawChart();
 }
 
