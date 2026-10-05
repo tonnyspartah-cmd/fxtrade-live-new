@@ -10,7 +10,7 @@ const $ = id => {
 };
 
 const state = {
-  ws:null, publicSocket:null, reconnect:null, symbol:'1HZ100V',
+  ws:null, publicSocket:null, reconnect:null, publicFeedIndex:0, symbol:'1HZ100V',
   prices:[], digits:Array(10).fill(0), stake:1, stopLoss:999,
   targetProfit:3, sessionNet:0, tradingLocked:false,
   contract:'OVERUNDER', accountType:'demo', balance:10000,
@@ -21,7 +21,7 @@ const state = {
 
 const DERIV_CLIENT_ID='34m6kBZ1JQGXBHSscpXXQ';
 const DERIV_API='https://api.derivws.com';
-const PUBLIC_WS='wss://api.derivws.com/trading/v1/options/ws/public';
+const PUBLIC_FEEDS=['wss://api.derivws.com/trading/v1/options/ws/public','wss://ws.binaryws.com/websockets/v3'];
 const REDIRECT_URI=window.location.origin+'/';
 const auth={token:sessionStorage.getItem('deriv_access_token')||null};
 
@@ -101,13 +101,15 @@ function signalFilter(info){
 }
 
 function drawChart(){
-  const c=ui.chart,ctx=c.getContext('2d'),r=c.getBoundingClientRect(),d=devicePixelRatio||1;
-  c.width=r.width*d;c.height=r.height*d;ctx.setTransform(d,0,0,d,0,0);ctx.clearRect(0,0,r.width,r.height);
-  const p=state.prices.slice(-55);if(p.length<2)return;
+  const c=ui.chart;if(!c)return;
+  const ctx=c.getContext('2d'),r=c.getBoundingClientRect(),d=window.devicePixelRatio||1;
+  const w=Math.max(1,r.width),h=Math.max(1,r.height);
+  c.width=Math.round(w*d);c.height=Math.round(h*d);ctx.setTransform(d,0,0,d,0,0);ctx.clearRect(0,0,w,h);
+  const p=state.prices.slice(-80);if(p.length<2)return;
   const min=Math.min(...p),max=Math.max(...p),span=max-min||1;
   ctx.beginPath();
-  p.forEach((v,i)=>{const x=i*(r.width/(p.length-1)),y=r.height-12-((v-min)/span)*(r.height-28);i?ctx.lineTo(x,y):ctx.moveTo(x,y)});
-  ctx.strokeStyle='#f4f0ff';ctx.lineWidth=3;ctx.stroke();
+  p.forEach((v,i)=>{const x=i*(w/(p.length-1)),y=h-12-((v-min)/span)*(h-24);i?ctx.lineTo(x,y):ctx.moveTo(x,y)});
+  ctx.strokeStyle='#18a9ff';ctx.lineWidth=2.5;ctx.lineJoin='round';ctx.lineCap='round';ctx.stroke();
 }
 
 function updateDigits(){
@@ -244,7 +246,7 @@ function onTick(t){
     if(ui.autoMode?.checked){
       if(d>=0&&d<=3){state.lowDigitStreak++;}
       else {state.lowDigitStreak=0;state.autoPairUsed=false;}
-      if(state.lowDigitStreak>=2&&!state.autoPairUsed&&!state.tradingLocked){
+      if(state.lowDigitStreak>=3&&!state.autoPairUsed&&!state.tradingLocked){
         state.autoPairUsed=true;state.lowDigitStreak=0;startAutoTrade('left');
       }
     }
@@ -259,11 +261,14 @@ function subscribePublic(ws){
 }
 function connectPublic(){
   try{state.publicSocket?.close()}catch{}
-  setConnection('CONNECTING…');const ws=new WebSocket(PUBLIC_WS);state.publicSocket=ws;let opened=false;
+  clearTimeout(state.reconnect);
+  const feed=PUBLIC_FEEDS[state.publicFeedIndex]||PUBLIC_FEEDS[0];
+  setConnection('CONNECTING…');
+  const ws=new WebSocket(feed);state.publicSocket=ws;let opened=false;
   ws.onopen=()=>{opened=true;setConnection('LIVE',true);subscribePublic(ws)};
   ws.onmessage=e=>{try{const d=JSON.parse(e.data);if(d.msg_type==='tick'&&d.tick)onTick(d.tick);if(d.msg_type==='history'&&d.history?.prices){if(handleScanHistory(d))return;state.prices=d.history.prices.map(Number).filter(Number.isFinite).slice(-120);if(ui.tickCount)ui.tickCount.textContent=state.prices.length;state.digits=Array(10).fill(0);state.prices.forEach(v=>{const z=lastDigit(v);if(z!==null)state.digits[z]++});analyze();startDeepScan()}if(d.msg_type==='active_symbols'&&Array.isArray(d.active_symbols))populateMarkets(d.active_symbols)}catch{}};
-  ws.onerror=()=>{if(!opened)setConnection('CONNECTION ERROR')};
-  ws.onclose=()=>{setConnection('RECONNECTING…');clearTimeout(state.reconnect);state.reconnect=setTimeout(connectPublic,3000)};
+  ws.onerror=()=>{if(!opened){if(state.publicFeedIndex<PUBLIC_FEEDS.length-1){state.publicFeedIndex++;try{ws.close()}catch{};setTimeout(connectPublic,150)}else setConnection('CONNECTION ERROR')}};
+  ws.onclose=()=>{if(opened){setConnection('RECONNECTING…');clearTimeout(state.reconnect);state.reconnect=setTimeout(connectPublic,3000)}else if(state.publicFeedIndex<PUBLIC_FEEDS.length-1){setTimeout(connectPublic,150)}else{setConnection('RECONNECTING…');clearTimeout(state.reconnect);state.reconnect=setTimeout(connectPublic,3000)}};
 }
 function populateMarkets(items){
   const merged=new Map(fallback.map(x=>[x[0],x[1]]));
@@ -386,7 +391,7 @@ $('autoMode').onclick=()=>{state.manual=false;$('autoMode').classList.add('selec
 $('manualMode').onclick=()=>{state.manual=true;$('manualMode').classList.add('selected');$('autoMode').classList.remove('selected')};
 $('connectDeriv').onclick=()=>auth.token?loadAccounts():startOAuth();
 $('accountType').onchange=async e=>{state.accountType=e.target.value;sessionStorage.setItem('deriv_account_type',state.accountType);if(auth.token)await connectSelectedAccount();else{$('accountType').value='demo';state.accountType='demo';toast('Connect Deriv first.')}};
-$('autoMode').onchange=e=>{state.lowDigitStreak=0;state.autoPairUsed=false;if(e.target.checked){toast('2-Digit Auto Over armed.')}else{state.autoRunning=false;state.autoSide=null;clearTimeout(state.autoTimer);toast('2-Digit Auto Over off.')}};
+$('autoMode').onchange=e=>{state.lowDigitStreak=0;state.autoPairUsed=false;if(e.target.checked){toast('3-Digit Auto Over armed.')}else{state.autoRunning=false;state.autoSide=null;clearTimeout(state.autoTimer);toast('3-Digit Auto Over off.')}};
 $('market').onchange=e=>{state.symbol=e.target.value;state.prices=[];state.digits=Array(10).fill(0);if(ui.tickCount)ui.tickCount.textContent='0';connectPublic()};
 $('stopLoss').oninput=riskUpdate;$('targetProfit').oninput=riskUpdate;$('multiplier').onchange=readRisk;
 window.addEventListener('resize',drawChart);
