@@ -14,7 +14,7 @@ const state = {
   prices:[], digits:Array(10).fill(0), stake:1, stopLoss:999,
   targetProfit:3, sessionNet:0, tradingLocked:false,
   contract:'OVERUNDER', accountType:'demo', balance:10000,
-  currency:'USD', authenticated:false, accountId:null,
+  currency:'USD', authenticated:false, accountId:null, ticks:1,
   waitingForProposal:null, proposalReqId:0, buyReqId:0, contractReqId:0,
   wins:0, losses:0, manual:false, multiplier:2, userStopped:false, autoRunning:false, autoSide:null, autoTimer:null, signalReady:false, signalScore:0, scanSeq:0, scanResults:new Map(), scanTimer:null, lowDigitStreak:0, autoPairUsed:false
 };
@@ -34,7 +34,7 @@ const ui={
   leftRule:$('leftRule'), rightRule:$('rightRule'),
   wins:$('wins'), losses:$('losses'), sessionNet:$('sessionNet'),
   signalText:$('signalText'), riskStatus:$('riskStatus'), chart:$('chart'), tickCount:$('tickCount'), autoMode:$('autoMode'), stopTrade:$('stopTrade'),
-  scanVolatility:$('scanVolatility'), scanContract:$('scanContract'), scanMarket:$('scanMarket'), scanPrediction:$('scanPrediction'), scanStrength:$('scanStrength')
+  scanVolatility:$('scanVolatility'), scanContract:$('scanContract'), scanMarket:$('scanMarket'), scanPrediction:$('scanPrediction'), scanStrength:$('scanStrength'), ticks:$('ticks')
 };
 
 const fallback=[
@@ -50,7 +50,7 @@ function toast(t){const e=$('toast');if(!e)return;e.textContent=t;e.classList.ad
 function fmt(n){return Number(n).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}
 function lastDigit(n){const s=String(n);const m=s.replace(/\D/g,'');return m?Number(m.at(-1)):null}
 function setConnection(text,ok=false){ui.connection.innerHTML='<i></i>'+text;ui.connection.style.color=ok?'#2ce795':'#ffc857'}
-function readRisk(){state.stopLoss=Math.max(0,Number($('stopLoss').value)||0);state.targetProfit=Math.max(0,Number($('targetProfit').value)||0);state.multiplier=Math.max(1,Number($('multiplier').value)||1)}
+function readRisk(){state.stopLoss=Math.max(0,Number($('stopLoss').value)||0);state.targetProfit=Math.max(0,Number($('targetProfit').value)||0);state.ticks=Math.max(1,Math.min(100,Math.floor(Number($('ticks')?.value)||1)));if($('ticks'))$('ticks').value=state.ticks;state.multiplier=Math.max(1,Number($('multiplier').value)||1)}
 function updateStopButton(){
   const b=$('stopTrade');
   if(!b)return;
@@ -341,8 +341,8 @@ function selectedAccount(){return savedAccounts()[state.accountType]||null}
 async function loadAccounts(){
   if(!auth.token)return;
   try{
-    const r=await fetch(DERIV_API+'/trading/v1/options/accounts',{headers:{Authorization:'Bearer '+auth.token}});
-    const d=await r.json();if(!r.ok)throw new Error(d?.errors?.[0]?.message||'Account lookup failed');
+    const r=await fetch('/api/deriv/proxy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:auth.token,path:'/trading/v1/options/accounts',method:'GET'})});
+    const d=await r.json();if(!r.ok)throw new Error(d?.errors?.[0]?.message||d?.error||'Account lookup failed');
     const raw=Array.isArray(d.data)?d.data:(Array.isArray(d.data?.accounts)?d.data.accounts:[]);
     const demo=raw.find(a=>String(a.account_type||a.type||'').toLowerCase()==='demo'),real=raw.find(a=>String(a.account_type||a.type||'').toLowerCase()==='real');
     sessionStorage.setItem('deriv_accounts',JSON.stringify({demo:demo||null,real:real||null}));
@@ -353,8 +353,8 @@ async function connectSelectedAccount(){
   const a=selectedAccount();if(!auth.token||!a){toast('No '+state.accountType+' Options account available.');return}
   state.accountId=a.account_id;state.currency=a.currency||'USD';
   try{
-    const r=await fetch(DERIV_API+'/trading/v1/options/accounts/'+encodeURIComponent(state.accountId)+'/otp',{method:'POST',headers:{Authorization:'Bearer '+auth.token}});
-    const d=await r.json();if(!r.ok||!d.data?.url)throw new Error(d?.errors?.[0]?.message||'Could not create Deriv session');
+    const r=await fetch('/api/deriv/proxy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:auth.token,path:'/trading/v1/options/accounts/'+encodeURIComponent(state.accountId)+'/otp',method:'POST',body:{}})});
+    const d=await r.json();if(!r.ok||!d.data?.url)throw new Error(d?.errors?.[0]?.message||d?.error||'Could not create Deriv session');
     const ws=new WebSocket(d.data.url);state.ws=ws;
     ws.onopen=()=>{state.authenticated=true;ui.connect.textContent='Deriv Connected';ui.connect.classList.add('connected');ui.accountLabel.textContent=state.accountType==='real'?'Real Account':'Demo Account';setConnection('DERIV '+state.accountType.toUpperCase(),true);ws.send(JSON.stringify({balance:1,subscribe:1,req_id:500}));ws.send(JSON.stringify({ticks:state.symbol,subscribe:1,req_id:501}))};
     ws.onmessage=e=>{try{const d=JSON.parse(e.data);if(d.error){if(d.req_id===state.proposalReqId||d.req_id===state.buyReqId)state.waitingForProposal=null;toast(d.error.message||'Deriv request failed.');return}if(d.msg_type==='balance'&&d.balance){state.balance=Number(d.balance.balance);ui.balance.textContent='$'+state.balance.toFixed(2)}if(d.msg_type==='tick'&&d.tick)onTick(d.tick);if(d.msg_type==='proposal'&&d.req_id===state.proposalReqId)handleProposal(d);if(d.msg_type==='buy'&&d.req_id===state.buyReqId)handleBuy(d);if(d.msg_type==='proposal_open_contract'&&d.req_id===state.contractReqId)handleContractUpdate(d)}catch{}};
@@ -374,11 +374,11 @@ function placeTrade(side, fromAuto=false){
   const account=selectedAccount();if(!account){toast('Selected Deriv account is unavailable.');return}
   const c=contractRequest(side),stake=Number(state.stake);if(!stake||stake<=0)return;
   state.proposalReqId++;state.waitingForProposal={side,stake,symbol:state.symbol,contractType:c.contract_type};
-  const req={proposal:1,amount:stake,basis:'stake',contract_type:c.contract_type,currency:state.currency,duration:1,duration_unit:'t',underlying_symbol:state.symbol,req_id:state.proposalReqId};if(c.barrier!==undefined)req.barrier=c.barrier;state.ws.send(JSON.stringify(req));
+  const req={proposal:1,amount:stake,basis:'stake',contract_type:c.contract_type,currency:state.currency,duration:state.ticks,duration_unit:'t',underlying_symbol:state.symbol,req_id:state.proposalReqId};if(c.barrier!==undefined)req.barrier=c.barrier;state.ws.send(JSON.stringify(req));
   document.querySelectorAll('.trade').forEach(b=>b.classList.remove('selected'));$(side==='left'?'over':'under').classList.add('selected');
 }
-function handleProposal(d){const p=d.proposal,t=state.waitingForProposal;if(!p||!t)return;const ask=Number(p.ask_price);if(!p.id||!Number.isFinite(ask)){state.waitingForProposal=null;toast('Invalid Deriv proposal.');return}ui.payout.textContent='$'+Number(p.payout??ask*1.96).toFixed(2);state.buyReqId++;state.ws.send(JSON.stringify({buy:String(p.id),price:ask,req_id:state.buyReqId}))}
-function handleBuy(d){const t=state.waitingForProposal;if(!t||!d.buy?.contract_id){state.waitingForProposal=null;return}state.ws.send(JSON.stringify({proposal_open_contract:1,contract_id:d.buy.contract_id,subscribe:1,req_id:++state.contractReqId}));ui.payout.textContent='$'+Number(d.buy.payout||0).toFixed(2);toast((state.accountType==='real'?'REAL ':'DEMO ')+'trade placed.');state.waitingForProposal={...t,contractId:d.buy.contract_id}}
+function handleProposal(d){const p=d.proposal,t=state.waitingForProposal;if(!p||!t)return;const ask=Number(p.ask_price);if(!p.id||!Number.isFinite(ask)){state.waitingForProposal=null;toast('Invalid Deriv proposal.');return}if(ui.payout)ui.payout.textContent='$'+Number(p.payout??ask*1.96).toFixed(2);state.buyReqId++;state.ws.send(JSON.stringify({buy:String(p.id),price:ask,req_id:state.buyReqId}))}
+function handleBuy(d){const t=state.waitingForProposal;if(!t||!d.buy?.contract_id){state.waitingForProposal=null;return}state.ws.send(JSON.stringify({proposal_open_contract:1,contract_id:d.buy.contract_id,subscribe:1,req_id:++state.contractReqId}));if(ui.payout)ui.payout.textContent='$'+Number(d.buy.payout||0).toFixed(2);toast((state.accountType==='real'?'REAL ':'DEMO ')+'trade placed.');state.waitingForProposal={...t,contractId:d.buy.contract_id}}
 function handleContractUpdate(d){
   const c=d.proposal_open_contract;if(!c||!state.waitingForProposal)return;
   const closed=c.is_sold===1||c.status==='sold'||c.status==='expired';if(!closed)return;
@@ -391,7 +391,7 @@ function handleContractUpdate(d){
   }
 }
 
-function setStake(v){state.stake=Math.max(1,Math.min(100,Number(v)||1));ui.stake.textContent=state.stake;ui.payout.textContent='$'+(state.stake*1.96).toFixed(2)}
+function setStake(v){state.stake=Math.max(0.25,Math.min(100,Number(v)||1));ui.stake.textContent=state.stake.toFixed(2);if(ui.payout)ui.payout.textContent='$'+(state.stake*1.96).toFixed(2)}
 function updateLabels(){
   if(state.contract==='MATCHDIFF'){ui.leftLabel.textContent='MATCH';ui.rightLabel.textContent='DIFFER';ui.leftRule.textContent='Current digit';ui.rightRule.textContent='Other digits'}
   else if(state.contract==='EVENODD'){ui.leftLabel.textContent='EVEN';ui.rightLabel.textContent='ODD';ui.leftRule.textContent='0, 2, 4, 6, 8';ui.rightRule.textContent='1, 3, 5, 7, 9'}
@@ -433,7 +433,7 @@ $('connectDeriv').onclick=()=>auth.token?loadAccounts():startOAuth();
 $('accountType').onchange=async e=>{state.accountType=e.target.value;sessionStorage.setItem('deriv_account_type',state.accountType);if(auth.token)await connectSelectedAccount();else{$('accountType').value='demo';state.accountType='demo';toast('Connect Deriv first.')}};
 $('autoMode').onchange=e=>{state.lowDigitStreak=0;state.autoPairUsed=false;if(e.target.checked){toast('3-Digit Auto Over armed.')}else{state.autoRunning=false;state.autoSide=null;clearTimeout(state.autoTimer);toast('3-Digit Auto Over off.')}};
 $('market').onchange=e=>{state.symbol=e.target.value;state.prices=[];state.digits=Array(10).fill(0);if(ui.tickCount)ui.tickCount.textContent='0';connectPublic()};
-$('stopLoss').oninput=riskUpdate;$('targetProfit').oninput=riskUpdate;$('multiplier').onchange=readRisk;
+$('stopLoss').oninput=riskUpdate;$('targetProfit').oninput=riskUpdate;$('ticks').oninput=readRisk;$('multiplier').onchange=readRisk;
 window.addEventListener('resize',drawChart);
 
 setStake(1);updateLabels();riskUpdate();connectPublic();finishOAuth().then(()=>{if(auth.token)loadAccounts()});

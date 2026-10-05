@@ -37,6 +37,25 @@ function publicAccount(a){ return {id:a.id,email:a.email,balance:a.balance,kyc:a
 async function api(req,res,pathname){
   try {
     if(req.method === "GET" && pathname === "/api/health") return json(res,200,{ok:true,mode:"sandbox",realMoney:false,serverWallet:true});
+    if(req.method === "POST" && pathname === "/api/deriv/proxy") {
+      const b=await body(req);
+      const token=String(b.token||"");
+      const apiPath=String(b.path||"");
+      const method=String(b.method||"GET").toUpperCase();
+      if(!token||!apiPath.startsWith("/trading/v1/options/")) return json(res,400,{error:"Invalid Deriv request"});
+      const upstream=await fetch("https://api.derivws.com"+apiPath,{method,headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:method==='GET'?undefined:JSON.stringify(b.body||{})});
+      const text=await upstream.text(); let data; try{data=JSON.parse(text)}catch{data={error:text||"Invalid response from Deriv"}}
+      return json(res,upstream.status,data);
+    }
+    if(req.method === "POST" && pathname === "/api/oauth/token") {
+      const b=await body(req);
+      const {code,code_verifier,redirect_uri,client_id}=b;
+      if(!code||!code_verifier||!redirect_uri||!client_id) return json(res,400,{error:"Missing OAuth parameters"});
+      const form=new URLSearchParams({grant_type:"authorization_code",client_id:String(client_id),code:String(code),code_verifier:String(code_verifier),redirect_uri:String(redirect_uri)});
+      const upstream=await fetch("https://auth.deriv.com/oauth2/token",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:form.toString()});
+      const text=await upstream.text(); let data; try{data=JSON.parse(text)}catch{data={error:text||"Invalid response from Deriv"}}
+      return json(res,upstream.status,data);
+    }
     if(req.method === "POST" && pathname === "/api/auth/register"){
       const b=await body(req), email=String(b.email||"").trim().toLowerCase(), password=String(b.password||"");
       if(!/^\S+@\S+\.\S+$/.test(email)) return json(res,400,{error:"Enter a valid email."});

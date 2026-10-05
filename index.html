@@ -21,6 +21,10 @@
     <section class="demo-card">
       <div class="wallet">▣</div>
       <div class="demo-copy"><div>Demo Account <span class="info">i</span></div><strong id="balance">$10,000.00</strong></div>
+      <div class="account-controls">
+        <select id="accountType" aria-label="Account type"><option value="demo">Demo</option><option value="real">Real</option></select>
+        <button id="connectDeriv" class="connect-button" type="button">Connect Deriv</button>
+      </div>
       <button id="reset" class="reset">↻ <span>Reset</span></button>
     </section>
 
@@ -102,6 +106,8 @@
         <label>STAKE</label>
         <div class="stake-control"><button data-delta="-1">−</button><strong id="stake">1.00</strong><button data-delta="1">+</button></div>
         <div class="presets"><button data-stake="0.25">$0.25</button><button data-stake="1">$1</button><button data-stake="5">$5</button><button data-stake="10">$10</button></div>
+        <label class="ticks-label">TICKS<input id="ticks" type="number" min="1" max="100" step="1" value="1"></label>
+        <div class="payout">Expected payout <strong id="payout">$1.96</strong></div>
         <div class="risk-grid">
           <label>Target Profit<input id="targetProfit" type="number" min="0" step="0.01" value="0" placeholder="0"></label>
           <label>Stop Loss<input id="stopLoss" type="number" min="0" step="0.01" value="0" placeholder="0"></label>
@@ -124,8 +130,6 @@
       <div class="auto-rule">(3 consecutive 0–3 digits = 1 trade,<br>then wait for a new sequence)</div>
       <button id="stopTrade" class="stop-button">▶ RESUME</button>
       <button id="manualMode" class="hidden-control" type="button">Manual</button>
-      <select id="accountType" class="hidden-control"><option value="demo">Demo</option><option value="real">Real</option></select>
-      <button id="connectDeriv" class="hidden-control" type="button">Connect Deriv</button>
       <span id="accountLabel" class="hidden-control">Demo Account</span>
       <input id="multiplier" class="hidden-control" value="2">
     </section>
@@ -136,6 +140,6 @@
   <footer><b><span>FX</span>TRADE.live</b><span>Practice. Learn. Improve.</span></footer>
 </div>
 <div id="toast" class="toast"></div>
-<script src="app.js?v=20261005-livefix3"></script>
+<script src="app.js?v=20261005-livefix4"></script>
 </body>
 </html>
