@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const __fxHidden = new Set(['accountLabel','accountType','connectDeriv','losses','manualMode','multiplier','signalText']);
+const __fxHidden = new Set(['accountLabel','accountType','connectDeriv','losses','multiplier','signalText']);
 const $ = id => {
   const found = document.getElementById(id);
   if(found) return found;
@@ -16,7 +16,7 @@ const state = {
   contract:'OVERUNDER', accountType:'demo', balance:10000,
   currency:'USD', authenticated:false, accountId:null, ticks:1,
   waitingForProposal:null, proposalReqId:0, buyReqId:0, contractReqId:0,
-  wins:0, losses:0, manual:false, multiplier:2, userStopped:false, autoRunning:false, autoSide:null, autoTimer:null, signalReady:false, signalScore:0, scanSeq:0, scanResults:new Map(), scanTimer:null, lowDigitStreak:0, autoPairUsed:false
+  wins:0, losses:0, tradeMode:'manual', multiplier:2, userStopped:false, autoRunning:false, autoSide:null, autoTimer:null, signalReady:false, signalScore:0, scanSeq:0, scanResults:new Map(), scanTimer:null, lowDigitStreak:0, autoPairUsed:false
 };
 
 const DERIV_CLIENT_ID='34m6kBZ1JQGXBHSscpXXQ';
@@ -29,6 +29,7 @@ const ui={
   price:$('price'), digitGrid:$('digitGrid'), digitBig:$('digitBig'), strongestDigit:$('strongestDigit'), strongestPct:$('strongestPct'), balance:$('balance'),
   direction:$('direction'), confidence:$('confidence'), connection:$('connection'),
   payout:$('payout'), stake:$('stake'), connect:$('connectDeriv'),
+  manualModeBtn:$('manualModeBtn'), autoModeBtn:$('autoModeBtn'), modeHint:$('modeHint'),
   accountType:$('accountType'), accountLabel:$('accountLabel'),
   leftLabel:$('leftTradeLabel'), rightLabel:$('rightTradeLabel'),
   leftRule:$('leftRule'), rightRule:$('rightRule'),
@@ -368,7 +369,6 @@ function contractRequest(side){
   return{contract_type:side==='left'?'CALL':'PUT'}
 }
 function placeTrade(side, fromAuto=false){
-  if(!fromAuto){ state.autoRunning=false; state.autoSide=null; clearTimeout(state.autoTimer); state.autoTimer=null; }
   readRisk();riskUpdate();if(state.tradingLocked)return;
   if(!auth.token||!state.ws||!state.authenticated){toast('Connect Deriv before trading.');return}
   if(state.waitingForProposal){toast('Please wait for the previous trade request.');return}
@@ -403,7 +403,31 @@ function updateLabels(){
 document.querySelectorAll('.contract').forEach(b=>b.onclick=()=>{document.querySelectorAll('.contract').forEach(x=>x.classList.remove('active'));b.classList.add('active');state.contract=b.dataset.contract;updateLabels();analyze()});
 document.querySelectorAll('[data-delta]').forEach(b=>b.onclick=()=>setStake(state.stake+Number(b.dataset.delta)));
 document.querySelectorAll('[data-stake]').forEach(b=>b.onclick=()=>setStake(Number(b.dataset.stake)));
+function syncTradingMode(){
+  const manual=state.tradeMode==='manual';
+  ui.manualModeBtn?.classList.toggle('active',manual);
+  ui.autoModeBtn?.classList.toggle('active',!manual);
+  if(ui.autoMode){
+    ui.autoMode.disabled=manual;
+    if(manual) ui.autoMode.checked=false;
+  }
+  if(ui.modeHint) ui.modeHint.textContent=manual
+    ? 'Manual: tap OVER/UNDER for one trade.'
+    : (ui.autoMode?.checked ? 'Auto: 3 low digits trigger an OVER trade.' : 'Auto: tap OVER/UNDER to start repeated trades.');
+}
+function setTradingMode(mode){
+  const next=mode==='auto'?'auto':'manual';
+  if(next==='manual'){
+    state.autoRunning=false; state.autoSide=null; clearTimeout(state.autoTimer); state.autoTimer=null;
+    state.userStopped=false;
+  }
+  state.tradeMode=next;
+  syncTradingMode();
+  riskUpdate();
+  toast(next==='manual'?'Manual trading selected.':'Auto trading selected.');
+}
 function startAutoTrade(side){
+  if(state.tradeMode!=='auto'){setTradingMode('auto');}
   if(state.autoRunning)return;
   readRisk(); state.userStopped=false; state.tradingLocked=false;
   state.autoRunning=true; state.autoSide=side;
@@ -420,22 +444,35 @@ function stopAutoTrade(){
   riskUpdate();
   toast('Trading stopped.');
 }
-$('over').onclick=()=>placeTrade('left',false);
-$('under').onclick=()=>placeTrade('right',false);
+$('over').onclick=()=>{
+  if(state.tradeMode==='manual') placeTrade('left',false);
+  else startAutoTrade('left');
+};
+$('under').onclick=()=>{
+  if(state.tradeMode==='manual') placeTrade('right',false);
+  else startAutoTrade('right');
+};
 $('stopTrade').onclick=()=>{
   if(state.autoRunning || !state.userStopped) stopAutoTrade();
   else { state.userStopped=false; state.tradingLocked=false; riskUpdate(); toast('Ready to trade.'); }
 };
-$('place').onclick=()=>{if(!state.signalReady){toast('Signal filter says WAIT — no trade placed.');return}const s=ui.direction.textContent;if(['MATCH','OVER','RISE','EVEN'].includes(s))placeTrade('left',false);else if(['DIFFER','UNDER','FALL','ODD'].includes(s))placeTrade('right',false);else toast('AI says WAIT — no trade placed.')};
+$('place').onclick=()=>{
+  if(!state.signalReady){toast('Signal filter says WAIT — no trade placed.');return}
+  const s=ui.direction.textContent;
+  const side=['MATCH','OVER','RISE','EVEN'].includes(s)?'left':['DIFFER','UNDER','FALL','ODD'].includes(s)?'right':null;
+  if(!side){toast('AI says WAIT — no trade placed.');return}
+  if(state.tradeMode==='manual') placeTrade(side,false);
+  else startAutoTrade(side);
+};
 $('reset').onclick=()=>{if(state.accountType==='real'){toast('Real balance cannot be reset.');return}state.sessionNet=0;state.userStopped=false;state.wins=0;state.losses=0;state.tradingLocked=false;ui.wins.textContent='0 W';ui.losses.textContent='0 L';riskUpdate();toast('Session reset.')};
-$('autoMode').onclick=()=>{state.manual=false;$('autoMode').classList.add('selected');$('manualMode').classList.remove('selected')};
-$('manualMode').onclick=()=>{state.manual=true;$('manualMode').classList.add('selected');$('autoMode').classList.remove('selected')};
+ui.manualModeBtn?.addEventListener('click',()=>setTradingMode('manual'));
+ui.autoModeBtn?.addEventListener('click',()=>setTradingMode('auto'));
 $('connectDeriv').onclick=()=>auth.token?loadAccounts():startOAuth();
 $('accountType').onchange=async e=>{state.accountType=e.target.value;sessionStorage.setItem('deriv_account_type',state.accountType);if(auth.token)await connectSelectedAccount();else{$('accountType').value='demo';state.accountType='demo';toast('Connect Deriv first.')}};
-$('autoMode').onchange=e=>{state.lowDigitStreak=0;state.autoPairUsed=false;if(e.target.checked){toast('3-Digit Auto Over armed.')}else{state.autoRunning=false;state.autoSide=null;clearTimeout(state.autoTimer);toast('3-Digit Auto Over off.')}};
+$('autoMode').onchange=e=>{if(state.tradeMode!=='auto'){e.target.checked=false;return}state.lowDigitStreak=0;state.autoPairUsed=false;if(e.target.checked){toast('3-Digit Auto Over armed.')}else{state.autoRunning=false;state.autoSide=null;clearTimeout(state.autoTimer);toast('3-Digit Auto Over off.')}syncTradingMode();};
 $('market').onchange=e=>{state.symbol=e.target.value;state.prices=[];state.digits=Array(10).fill(0);if(ui.tickCount)ui.tickCount.textContent='0';connectPublic()};
 $('stopLoss').oninput=riskUpdate;$('targetProfit').oninput=riskUpdate;$('ticks').oninput=readRisk;$('multiplier').onchange=readRisk;
 window.addEventListener('resize',drawChart);
 
-setStake(1);updateLabels();riskUpdate();connectPublic();finishOAuth().then(()=>{if(auth.token)loadAccounts()});
+setStake(1);updateLabels();syncTradingMode();riskUpdate();connectPublic();finishOAuth().then(()=>{if(auth.token)loadAccounts()});
 })();

@@ -125,11 +125,17 @@
       </div>
     </section>
 
-    <section class="auto-row">
-      <label class="auto-toggle"><input id="autoMode" type="checkbox"><span>3-Digit<br><b>Auto Over</b></span></label>
-      <div class="auto-rule"><b>MANUAL:</b> tap OVER/UNDER for one trade.<br><b>AUTO:</b> 3 consecutive 0–3 digits = 1 trade.</div>
-      <button id="stopTrade" class="stop-button">▶ RESUME</button>
-      <button id="manualMode" class="hidden-control" type="button">Manual</button>
+    <section class="mode-row">
+      <div class="mode-block">
+        <span class="mode-title">TRADING MODE</span>
+        <div class="mode-toggle" role="group" aria-label="Trading mode">
+          <button id="manualModeBtn" class="mode-btn active" type="button">MANUAL</button>
+          <button id="autoModeBtn" class="mode-btn" type="button">AUTO</button>
+        </div>
+      </div>
+      <label class="auto-toggle"><input id="autoMode" type="checkbox" disabled><span>3-Digit<br><b>Auto Over</b></span></label>
+      <div id="modeHint" class="auto-rule">Manual: tap OVER/UNDER for one trade.</div>
+      <button id="stopTrade" class="stop-button" type="button">■ STOP</button>
       <span id="accountLabel" class="hidden-control">Demo Account</span>
       <input id="multiplier" class="hidden-control" value="2">
     </section>

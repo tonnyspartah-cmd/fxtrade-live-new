@@ -172,3 +172,30 @@ html,body{overflow-x:hidden;overflow-y:auto}
 
 /* ===== FXTRADE v29 final controls/cursor fix ===== */
 .account-controls{display:flex;align-items:center;gap:8px;margin-left:auto}.account-controls select,.connect-button{height:40px;border:1px solid #176da6;border-radius:9px;background:#071d31;color:#eaf4ff;padding:0 10px;font-weight:800}.connect-button{background:#078eff;border-color:#20a5ff}.connect-button.connected{background:#063b2c;border-color:#2ce795;color:#2ce795}.ticks-label{display:block;color:#8eb1d4;font-size:10px;font-weight:800;margin-top:7px;text-align:left}.ticks-label input{display:block;width:100%;margin-top:3px;border:1px solid #123e61;border-radius:7px;background:#071d31;color:#eef7ff;padding:6px 4px;font-size:12px;text-align:center}.digit-grid{position:relative}.digit-cursor{position:absolute;bottom:-4px;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:8px solid #ff3f45;transform:translateX(-50%);filter:drop-shadow(0 0 4px #ff3f45);transition:left .18s ease;z-index:3;pointer-events:none}.digit-cursor::after{content:'';position:absolute;left:-1px;top:8px;width:2px;height:9px;background:#ff3f45}.digit.high{position:relative}.digit.high::after{content:'HOT';position:absolute;top:2px;right:3px;color:#2ce795;font-size:6px;font-weight:900}@media(max-width:760px){.account-controls{gap:4px}.account-controls select,.connect-button{height:30px;padding:0 6px;font-size:9px}.account-controls{order:3;width:100%;margin-left:0}.demo-card{flex-wrap:wrap}.reset{margin-left:auto}.ticks-label{font-size:8px}.ticks-label input{font-size:10px;padding:5px 2px}.digit-cursor{bottom:-3px}}
+
+/* ===== Manual / Auto trading mode selector ===== */
+.mode-row{display:grid;grid-template-columns:auto auto 1fr auto;align-items:center;gap:12px;margin:0 30px 10px;padding:8px 4px;color:#eaf4ff}
+.mode-block{display:flex;align-items:center;gap:8px}
+.mode-title{color:#8eb1d4;font-size:11px;font-weight:900;letter-spacing:.4px}
+.mode-toggle{display:flex;border:1px solid #123e61;border-radius:9px;overflow:hidden;background:#071d31}
+.mode-btn{border:0;background:#071d31;color:#9db9d2;padding:9px 14px;font-size:12px;font-weight:900}
+.mode-btn.active{background:#078eff;color:#fff;box-shadow:inset 0 0 0 1px #20a5ff}
+.mode-btn:focus-visible{outline:2px solid #20a5ff;outline-offset:1px}
+.auto-toggle{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:800;line-height:1.05;white-space:nowrap}
+.auto-toggle input{width:20px;height:20px;accent-color:#08d06a}
+.auto-toggle input:disabled{opacity:.4}
+.auto-rule{color:#a7bdd2;font-size:11px;font-weight:700;line-height:1.2}
+@media(max-width:760px){
+  .mode-row{grid-template-columns:auto 1fr auto;gap:6px;margin:0 10px 8px;padding:3px 0}
+  .mode-block{gap:5px}
+  .mode-title{display:none}
+  .mode-btn{padding:7px 10px;font-size:9px}
+  .auto-toggle{font-size:8px;gap:4px}
+  .auto-toggle input{width:17px;height:17px}
+  .mode-row .auto-rule{grid-column:1/4;font-size:8px;line-height:1.1}
+  .mode-row .stop-button{grid-column:3;grid-row:1;justify-self:end;padding:9px 10px;min-width:83px;font-size:9px;border-radius:9px}
+}
+@media(max-width:380px){
+  .mode-btn{padding:6px 8px;font-size:8px}
+  .mode-row .stop-button{min-width:74px;font-size:8px}
+}
