@@ -9,7 +9,7 @@
 <div class="app">
   <aside class="sidebar">
     <div class="brand"><span class="brand-dot"></span> FXTRADE</div>
-    <div class="demo-badge">SANDBOX • V28</div>
+    <div class="demo-badge">FXTRADE • DEMO / DERIV</div>
     <nav>
       <button class="nav active" data-section="dashboard">⌂ <span>Dashboard</span></button>
       <button class="nav" data-section="account">◉ <span>Account</span></button>
@@ -24,7 +24,7 @@
   <main class="main">
     <header class="topbar">
       <div><div class="eyebrow">SMART DIGITAL TERMINAL</div><h1>Trading Dashboard</h1></div>
-      <div class="top-actions"><span class="pill live" id="modeBadge">● SANDBOX</span><button class="ghost account-jump" data-jump="wallet">Wallet</button><button class="ghost account-jump" data-jump="trades">History</button><button id="resetBtn" class="ghost">Reset Demo</button></div>
+      <div class="top-actions"><span class="pill live" id="modeBadge">● DEMO</span><button id="derivConnectBtn" class="primary small">CONNECT DERIV</button><button class="ghost account-jump" data-jump="wallet">Wallet</button><button class="ghost account-jump" data-jump="trades">History</button><button id="resetBtn" class="ghost">Reset Demo</button></div>
     </header>
 
     <div class="account-strip"><div><span>ACCOUNT</span><b id="accountName">FXTRADE Demo User</b></div><div><span>WALLET</span><b id="accountWallet">$1,000.00</b></div><div><span>TRADES</span><b id="accountTrades">0</b></div><button class="primary small account-jump" data-jump="wallet">MANAGE WALLET</button></div>
@@ -68,10 +68,10 @@
       <div class="grid">
         <div class="card market-card">
           <div class="card-head"><div><span class="eyebrow">MARKET</span><h2 id="symbolTitle">Synthetic Volatility 100</h2></div>
-            <select id="market"><option>Volatility 100</option><option>Volatility 75</option><option>Volatility 50</option><option>Volatility 25</option><option>Volatility 10</option></select>
+            <select id="market"><option value="R_100">Volatility 100</option><option value="R_75">Volatility 75</option><option value="R_50">Volatility 50</option><option value="R_25">Volatility 25</option><option value="R_10">Volatility 10</option></select>
           </div>
           <div class="price-row"><div><span class="muted">SIMULATED INDEX</span><div id="price" class="price">100000.00</div></div><div class="tick"><span>LAST DIGIT</span><b id="lastDigit">0</b></div></div>
-          <canvas id="chart" height="170"></canvas><div class="digits" id="digits"></div>
+          <div class="live-bar"><span id="feedStatus">● DEMO TICKS</span><span id="liveSymbol">R_100</span><span id="liveQuote">—</span></div><canvas id="chart" height="170"></canvas><div class="digits" id="digits"></div>
         </div>
 
         <div class="card scan-card">
@@ -83,12 +83,12 @@
 
         <div class="card trade-card">
           <div class="card-head"><div><span class="eyebrow">ORDER PANEL</span><h2>Place Trade</h2></div><span id="autoBadge" class="pill">AUTO OFF</span></div>
-          <div class="contract-tabs" id="contractTabs"><button class="tab active" data-type="OVER">OVER</button><button class="tab" data-type="UNDER">UNDER</button><button class="tab" data-type="EVEN">EVEN</button><button class="tab" data-type="ODD">ODD</button></div>
+          <div class="contract-tabs" id="contractTabs"><button class="tab active" data-type="OVER">OVER</button><button class="tab" data-type="UNDER">UNDER</button><button class="tab" data-type="EVEN">EVEN</button><button class="tab" data-type="ODD">ODD</button><button class="tab" data-type="RISE">RISE</button><button class="tab" data-type="FALL">FALL</button></div>
           <label>Stake <div class="input-wrap">$<input id="stake" type="number" min="0.10" step="0.10" value="5"></div></label>
           <div class="quick"><button data-stake="1">$1</button><button data-stake="5">$5</button><button data-stake="10">$10</button><button data-stake="25">$25</button></div>
           <label>Barrier <div class="input-wrap"><input id="barrier" type="number" min="0" max="9" value="3"></div></label>
-          <div class="row2"><label>Target Profit<div class="input-wrap">$<input id="target" type="number" value="50"></div></label><label>Stop Loss<div class="input-wrap">$<input id="stop" type="number" value="30"></div></label></div>
-          <button id="tradeBtn" class="trade-btn">PLACE SIMULATED TRADE</button><button id="autoBtn" class="stop-btn">START AUTO</button><div class="rule">Auto trigger: <b id="triggerCount">3</b> consecutive matching digits.</div>
+          <div class="row2"><label>Target Profit<div class="input-wrap">$<input id="target" type="number" min="0" step="1" value="50"></div></label><label>Stop Loss<div class="input-wrap">$<input id="stop" type="number" min="0" step="1" value="30"></div></label></div>
+          <button id="tradeBtn" class="trade-btn">PLACE DEMO TRADE</button><button id="autoBtn" class="stop-btn">START DEMO AUTO</button><div class="rule">Auto trigger: <b id="triggerCount">3</b> consecutive matching digits.</div>
         </div>
 
         <div class="card activity-card">
@@ -113,8 +113,8 @@
 
     <section id="transactions" class="section"><div class="page-title"><div><span class="eyebrow">WALLET LEDGER</span><h2>Deposit & Withdrawal History</h2></div><button id="clearTransactions" class="ghost">Clear Transactions</button></div><div class="card"><div class="table" id="transactionTable"></div></div></section>
 
-    <section id="settings" class="section"><div class="page-title"><div><span class="eyebrow">ACCOUNT</span><h2>Settings</h2></div></div><div class="card settings-card"><label>Display name<div class="input-wrap"><input id="displayName" value="FXTRADE Demo User"></div></label><label>Auto trigger<div class="input-wrap"><input id="triggerInput" type="number" min="1" max="9" value="3"></div></label><p class="muted">These settings apply to this browser demo. They are not stored on a production server.</p><button id="saveSettings" class="primary">SAVE SETTINGS</button></div></section>
+    <section id="settings" class="section"><div class="page-title"><div><span class="eyebrow">ACCOUNT</span><h2>Settings</h2></div></div><div class="card settings-card"><h2>Deriv connection</h2><p class="muted">OAuth uses your own Deriv account. Enter the Client ID from your registered Deriv OAuth app.</p><label>Deriv Client ID<div class="input-wrap"><input id="derivClientId" placeholder="Your Deriv OAuth client ID"></div></label><button id="saveDerivSettings" class="primary">SAVE DERIV SETTINGS</button><div id="derivStatus" class="muted">Not connected</div><hr><label>Display name<div class="input-wrap"><input id="displayName" value="FXTRADE Demo User"></div></label><label>Auto trigger<div class="input-wrap"><input id="triggerInput" type="number" min="1" max="9" value="3"></div></label><p class="muted">These settings apply to this browser demo. They are not stored on a production server.</p><button id="saveSettings" class="primary">SAVE SETTINGS</button></div></section>
   </main>
 </div>
-<script src="/ai-signal.js"></script><script src="/app.js"></script>
+<script src="/ai-signal.js"></script><script src="/deriv-live.js"></script><script src="/app.js"></script>
 </body></html>
