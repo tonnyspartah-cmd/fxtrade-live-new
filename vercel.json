@@ -10,8 +10,7 @@
           "styles.css",
           "app.js",
           "ai-signal.html",
-          "ai-signal.js",
-
+          "ai-signal.js"
         ]
       }
     }

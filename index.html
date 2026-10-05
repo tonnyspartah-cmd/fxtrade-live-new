@@ -24,7 +24,7 @@
   <main class="main">
     <header class="topbar">
       <div><div class="eyebrow">SMART DIGITAL TERMINAL</div><h1>Trading Dashboard</h1></div>
-      <div class="top-actions"><span class="pill live" id="modeBadge">● DEMO</span><button id="connectDerivBtn" class="connect-btn">CONNECT DERIV</button><button class="ghost account-jump" data-jump="wallet">Wallet</button><button class="ghost account-jump" data-jump="trades">History</button><button id="resetBtn" class="ghost">Reset</button></div>
+      <div class="top-actions"><span class="pill live" id="modeBadgeGlobal">● DEMO</span><button id="connectDerivBtnGlobal" class="connect-btn">CONNECT DERIV</button><button class="ghost account-jump" data-jump="wallet">Wallet</button><button class="ghost account-jump" data-jump="trades">History</button><button id="resetBtnGlobal" class="ghost">Reset</button></div>
     </header>
 
     <div class="account-strip"><div class="account-user"><span>ACCOUNT</span><b id="accountName">FXTRADE Demo User</b></div><div><span>BALANCE</span><b id="accountWallet">$1,000.00</b></div><div><span>TRADES</span><b id="accountTrades">0</b></div><div class="connection-state"><span>CONNECTION</span><b id="connectionState">SIMULATED</b></div><button class="primary small account-jump" data-jump="wallet">MANAGE WALLET</button></div>
@@ -64,43 +64,57 @@
       <div class="warning">Real deposits and withdrawals are intentionally disabled. A production deployment needs an approved payment provider, server-side ledger, KYC/AML controls, licensing and reconciliation before real customer funds are accepted.</div>
     </section>
 
-    <section id="dashboard" class="section active-section">
-      <div class="grid">
-        <div class="card market-card">
-          <div class="card-head"><div><span class="eyebrow">MARKET</span><h2 id="symbolTitle">Synthetic Volatility 100</h2></div>
-            <select id="market"><option>Volatility 100</option><option>Volatility 75</option><option>Volatility 50</option><option>Volatility 25</option><option>Volatility 10</option></select>
+    <section id="dashboard" class="section active-section reference-dashboard">
+      <div class="ref-shell">
+        <div class="ref-topline">
+          <div class="ref-brand"><b>FXTRADE</b><span>.live</span></div>
+          <div class="ref-actions"><span id="modeBadge" class="ref-mode">● DEMO</span><button id="connectDerivBtn" class="ref-connect">CONNECT DERIV</button><button id="resetBtn" class="ref-reset">RESET</button></div>
+        </div>
+
+        <div class="ref-controls card">
+          <label>Market<select id="market"><option>Volatility 100 (1s) Index</option><option>Volatility 75 (1s) Index</option><option>Volatility 50 (1s) Index</option><option>Volatility 25 (1s) Index</option><option>Volatility 10 (1s) Index</option></select></label>
+          <div class="contract-area"><span>Contract Type</span><div id="contractTabs" class="ref-contract-tabs"><button class="tab active" data-type="OVER">Over / Under</button><button class="tab" data-type="RISE">Rise / Fall</button><button class="tab" data-type="EVEN">Even / Odd</button></div></div>
+        </div>
+
+        <div class="ref-summary">
+          <div class="ref-mini card"><span>Current Price</span><strong id="price">100000.00</strong><small>● Live</small></div>
+          <div class="ref-mini card center"><span>Prediction Digit</span><strong id="lastDigit" class="prediction">0</strong><small id="lastResult">—</small></div>
+          <button type="button" class="ref-mini card analysis deep-scan-card" id="deepScanCard" aria-label="Run Deep Scan">
+            <b>DEEP SCAN</b><strong id="signal">WAIT</strong><small id="scanMeta">Tap to scan volatility + market</small><em id="pattern">Analyzes the selected market and compares volatility setups</em>
+          </button>
+        </div>
+
+        <div class="card ref-digits-card">
+          <div class="ref-section-head"><h2>▮ ▮ ▮ Last Digit Analysis</h2><span>Strongest <b id="strongestDigit">—</b></span></div>
+          <div class="digits" id="digits"></div>
+          <p>Percentages are calculated from the tick sample used by this dashboard.</p>
+        </div>
+
+        <div class="card ref-market-card">
+          <div class="ref-section-head"><h2>Live Market</h2><span>60 ticks</span></div>
+          <canvas id="chart" height="150"></canvas>
+        </div>
+
+        <div class="card ref-trade-panel">
+          <div class="stake-block"><b>STAKE</b><div class="stake-step"><button type="button" id="stakeMinus">−</button><input id="stake" type="number" min="0.10" step="0.10" value="5"><button type="button" id="stakePlus">+</button></div><div class="quick"><button data-stake="0.25">$0.25</button><button data-stake="1">$1</button><button data-stake="5">$5</button><button data-stake="10">$10</button></div></div>
+          <div class="trade-middle">
+            <label>Target Profit<input id="target" type="number" value="50"></label>
+            <label>Stop Loss<input id="stop" type="number" value="30"></label>
+            <div class="ref-pl"><span>P/L (SESSION)</span><strong id="pl">$0.00</strong></div>
+            <div class="ref-wl"><span>WINS / LOSSES</span><strong><i id="wins">0</i> - <i id="losses">0</i></strong></div>
+            <span id="balance" class="hidden-stat">$1000.00</span><span id="winrate" class="hidden-stat">0%</span>
           </div>
-          <div class="price-row"><div><span class="muted">DEMO MARKET PRICE</span><div id="price" class="price">100000.00</div></div><div class="tick"><span>LAST DIGIT</span><b id="lastDigit">0</b></div></div>
-          <canvas id="chart" height="170"></canvas><div class="digits" id="digits"></div>
+          <button id="tradeBtn" class="direction-btn over">↑ OVER<small>Digits above barrier</small></button>
+          <button id="underTradeBtn" class="direction-btn under">↓ UNDER<small>Digits below barrier</small></button>
+          <input id="barrier" type="number" min="0" max="9" value="3" class="barrier-hidden">
+          <span id="autoBadge" class="hidden-stat">AUTO OFF</span><span id="openTrade" class="hidden-stat">None</span><span id="targetView" class="hidden-stat">$50</span><span id="stopView" class="hidden-stat">-$30</span>
         </div>
 
-        <div class="card scan-card">
-          <div class="card-head"><div><span class="eyebrow">FXTRADE ANALYSIS</span><h2>Deep Scan</h2></div><button id="scanBtn" class="primary small">SCAN</button></div>
-          <div class="scan-state" id="scanState"><div class="radar"></div><div><b>Ready to scan</b><p>Scan volatility + market conditions.</p></div></div>
-          <div class="signal"><span>Recommended Volatility</span><strong id="scanVolatility">—</strong></div>
-          <div class="signal"><span>Contract</span><strong id="signal">WAIT</strong></div>
-          <div class="signal"><span>Confidence</span><strong id="scanConfidence">—</strong></div>
-          <div class="signal"><span>Market</span><strong id="scanMarket">Waiting for scan</strong></div>
-          <div class="signal"><span>Prediction Digit</span><strong id="scanDigit">—</strong></div>
-          <div class="signal"><span>Data strength</span><strong id="strength">—</strong></div>
-          <div class="scan-action" id="scanAction">Action: WAIT</div>
-          <div class="warning">Statistical analysis only. No signal guarantees a winning trade.</div>
-        </div>
+        <div class="ref-auto-row"><button id="autoBtn" class="auto-rule">☑ <b><span id="triggerCount">3</span>-Digit Auto Trade</b><small>matching conditions trigger 1 trade, then wait for a new setup</small></button><button id="stopAutoBtn" class="yellow-stop">■ STOP</button></div>
+        <div class="ref-footer"><span>● Live market connected</span><span><b>FXTRADE</b>.live &nbsp;&nbsp; Practice mode</span></div>
 
-        <div class="card trade-card">
-          <div class="card-head"><div><span class="eyebrow">ORDER PANEL</span><h2>Place Trade</h2></div><span id="autoBadge" class="pill">AUTO OFF</span></div>
-          <div class="contract-tabs" id="contractTabs"><button class="tab active" data-type="OVER">OVER</button><button class="tab" data-type="UNDER">UNDER</button><button class="tab" data-type="EVEN">EVEN</button><button class="tab" data-type="ODD">ODD</button><button class="tab" data-type="RISE">RISE</button><button class="tab" data-type="FALL">FALL</button></div>
-          <label>Stake <div class="input-wrap">$<input id="stake" type="number" min="0.10" step="0.10" value="5"></div></label>
-          <div class="quick"><button data-stake="1">$1</button><button data-stake="5">$5</button><button data-stake="10">$10</button><button data-stake="25">$25</button></div>
-          <label>Barrier <div class="input-wrap"><input id="barrier" type="number" min="0" max="9" value="3"></div></label>
-          <div class="row2"><label>Target Profit<div class="input-wrap">$<input id="target" type="number" value="50"></div></label><label>Stop Loss<div class="input-wrap">$<input id="stop" type="number" value="30"></div></label></div>
-          <button id="tradeBtn" class="trade-btn">PLACE DEMO TRADE</button><button id="autoBtn" class="stop-btn">START DEMO AUTO</button><div class="rule">Auto trigger: <b id="triggerCount">3</b> matching conditions • Deep Scan can recommend the contract.</div>
-        </div>
-
-        <div class="card activity-card">
-          <div class="card-head"><div><span class="eyebrow">PERFORMANCE</span><h2>Live Activity</h2></div><button id="clearBtn" class="ghost small">Clear</button></div>
-          <div class="activity-grid"><div><span>Open trade</span><b id="openTrade">None</b></div><div><span>Last result</span><b id="lastResult">—</b></div><div><span>Target</span><b id="targetView">$50</b></div><div><span>Stop</span><b id="stopView">-$30</b></div></div>
-          <div class="history" id="history"><div class="empty">No trades yet. Start with a demo trade.</div></div>
+        <div class="ref-hidden-support">
+          <button id="scanBtn">SCAN</button><div id="scanState"><b>Ready to scan</b></div><div id="history"></div><button id="clearBtn">Clear</button>
         </div>
       </div>
     </section>
