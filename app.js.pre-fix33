@@ -35,7 +35,7 @@ const ui={
   leftRule:$('leftRule'), rightRule:$('rightRule'),
   wins:$('wins'), losses:$('losses'), sessionNet:$('sessionNet'),
   signalText:$('signalText'), riskStatus:$('riskStatus'), chart:$('chart'), tickCount:$('tickCount'), autoMode:$('autoMode'), stopTrade:$('stopTrade'),
-  scanVolatility:$('scanVolatility'), scanContract:$('scanContract'), scanMarket:$('scanMarket'), scanPrediction:$('scanPrediction'), scanStrength:$('scanStrength'), deepScanBtn:$('deepScanBtn'), deepScanBottom:$('deepScanBottom'), ticks:$('ticks')
+  scanVolatility:$('scanVolatility'), scanContract:$('scanContract'), scanMarket:$('scanMarket'), scanPrediction:$('scanPrediction'), scanStrength:$('scanStrength'), ticks:$('ticks')
 };
 
 const fallback=[
@@ -189,48 +189,32 @@ function renderDeepScan(result, scanning=false){
   ui.scanStrength.textContent=result.strength;
 }
 function startDeepScan(){
-  if(!ui.scanVolatility)return;
+  if(!state.publicSocket || state.publicSocket.readyState!==1 || !ui.scanVolatility)return;
   clearTimeout(state.scanTimer);
-  const symbols=fallback.filter(([sym])=>/1HZ/.test(sym)).slice(0,8).map(x=>x[0]);
+  const symbols=fallback.filter(([sym])=>/1HZ/.test(sym)).slice(0,5).map(x=>x[0]);
   const seq=++state.scanSeq; state.scanResults=new Map();
   renderDeepScan(null,true);
-  const socketReady=state.publicSocket && state.publicSocket.readyState===1;
-  if(socketReady){
-    symbols.forEach((symbol,index)=>{
-      const reqId=900000+seq*100+index;
-      state.scanResults.set(reqId,{symbol});
-      setTimeout(()=>{
-        if(state.publicSocket && state.publicSocket.readyState===1 && seq===state.scanSeq){
-          state.publicSocket.send(JSON.stringify({ticks_history:symbol,count:60,end:'latest',style:'ticks',req_id:reqId}));
-        }
-      }, index*100);
-    });
-  }
-  // Never leave the card stuck on SCANNING. If the multi-symbol history request
-  // is unavailable, score the currently streaming symbol instead.
-  state.scanTimer=setTimeout(()=>finishDeepScan(seq),socketReady?2400:300);
+  symbols.forEach((symbol,index)=>{
+    const reqId=900000+seq*100+index;
+    state.scanResults.set(reqId,{symbol});
+    setTimeout(()=>{
+      if(state.publicSocket && state.publicSocket.readyState===1 && seq===state.scanSeq){
+        state.publicSocket.send(JSON.stringify({ticks_history:symbol,count:60,end:'latest',style:'ticks',req_id:reqId}));
+      }
+    }, index*120);
+  });
+  state.scanTimer=setTimeout(()=>finishDeepScan(seq),2200);
 }
 function finishDeepScan(seq){
   if(seq!==state.scanSeq)return;
   const candidates=[];
-  state.scanResults.forEach((v)=>{if(v.prices){const r=scoreCandidate(v.symbol,v.prices);if(r)candidates.push(r)}});
-  // Fallback: analyze the live stream already displayed on the page.
-  if(!candidates.length && state.prices.length>=25){
-    const current=scoreCandidate(state.symbol,state.prices);
-    if(current)candidates.push(current);
-  }
+  state.scanResults.forEach((v,reqId)=>{if(v.prices){const r=scoreCandidate(v.symbol,v.prices);if(r)candidates.push(r)}});
   candidates.sort((a,b)=>b.score-a.score);
   const best=candidates[0];
   if(best){
     renderDeepScan(best);
-    state.signalScore=best.confidence;
-    state.signalReady=best.direction!=='WAIT' && best.confidence>=65;
-    toast('Deep Scan complete: '+best.direction+' on '+scanMarketLabel(best.symbol));
-  }else{
-    renderDeepScan(null);
-    state.signalReady=false;
-    toast('Deep Scan needs more live tick data.');
-  }
+    state.signalScore=best.confidence; state.signalReady=best.direction!=='WAIT' && best.confidence>=65;
+  }else renderDeepScan(null);
 }
 function handleScanHistory(d){
   const entry=state.scanResults.get(d.req_id); if(!entry)return false;
@@ -472,9 +456,6 @@ $('stopTrade').onclick=()=>{
   if(state.autoRunning || !state.userStopped) stopAutoTrade();
   else { state.userStopped=false; state.tradingLocked=false; riskUpdate(); toast('Ready to trade.'); }
 };
-ui.deepScanBtn?.addEventListener('click',()=>startDeepScan());
-ui.deepScanBottom?.addEventListener('click',()=>startDeepScan());
-$('analyze').onclick=()=>{ analyze(); startDeepScan(); };
 $('place').onclick=()=>{
   if(!state.signalReady){toast('Signal filter says WAIT — no trade placed.');return}
   const s=ui.direction.textContent;

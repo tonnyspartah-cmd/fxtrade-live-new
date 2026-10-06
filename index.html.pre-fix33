@@ -69,7 +69,7 @@
         <small>Next tick (1s)</small>
       </div>
       <div class="panel ai-panel deep-scan-panel">
-        <div class="deep-scan-title"><span>🤖 AI DEEP SCAN</span><button id="deepScanBtn" class="scan-button" type="button">SCAN</button></div>
+        <span>🤖 AI DEEP SCAN</span>
         <strong id="direction">WAIT</strong>
         <b>Confidence: <em id="confidence">—</em></b>
         <div class="deep-scan-line"><span>Volatility</span><b id="scanVolatility">Scanning…</b></div>
@@ -140,7 +140,7 @@
       <input id="multiplier" class="hidden-control" value="2">
     </section>
 
-    <div class="status-row"><span id="connection">● Connecting…</span><button id="analyze">Analyze</button><button id="deepScanBottom" class="scan-button" type="button">Deep Scan</button></div>
+    <div class="status-row"><span id="connection">● Connecting…</span><button id="analyze">Analyze</button></div>
   </main>
 
   <footer><b><span>FX</span>TRADE.live</b><span>Practice. Learn. Improve.</span></footer>
