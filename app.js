@@ -272,7 +272,7 @@ function onTick(t){
       }
     }
   }
-  ui.price.textContent=fmt(q); if(ui.tickCount)ui.tickCount.textContent=state.prices.length; analyze(); if(state.prices.length%8===0)startDeepScan();
+  ui.price.textContent=fmt(q); if(ui.tickCount)ui.tickCount.textContent=state.prices.length; analyze();
 }
 
 function subscribePublic(ws){
