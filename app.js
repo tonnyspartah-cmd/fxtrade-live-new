@@ -51,7 +51,7 @@ function toast(t){const e=$('toast');if(!e)return;e.textContent=t;e.classList.ad
 function fmt(n){return Number(n).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}
 function lastDigit(n){const s=String(n);const m=s.replace(/\D/g,'');return m?Number(m.at(-1)):null}
 function setConnection(text,ok=false){ui.connection.innerHTML='<i></i>'+text;ui.connection.style.color=ok?'#2ce795':'#ffc857'}
-function readRisk(){state.stopLoss=Math.max(0,Number($('stopLoss').value)||0);state.targetProfit=Math.max(0,Number($('targetProfit').value)||0);state.ticks=Math.max(1,Math.min(100,Math.floor(Number($('ticks')?.value)||1)));if($('ticks'))$('ticks').value=state.ticks;state.multiplier=Math.max(1,Number($('multiplier').value)||1)}
+function readRisk(){state.stopLoss=Math.max(0,Number($('stopLoss').value)||0);state.targetProfit=Math.max(0,Number($('targetProfit').value)||0);const tickEl=$('ticks');if(tickEl&&String(tickEl.value).trim()!==''){state.ticks=Math.max(1,Math.min(100,Math.floor(Number(tickEl.value)||1)));tickEl.value=state.ticks;}state.multiplier=Math.max(1,Number($('multiplier').value)||1)}
 function updateStopButton(){
   const b=$('stopTrade');
   if(!b)return;
@@ -490,7 +490,7 @@ $('connectDeriv').onclick=()=>auth.token?loadAccounts():startOAuth();
 $('accountType').onchange=async e=>{state.accountType=e.target.value;sessionStorage.setItem('deriv_account_type',state.accountType);if(auth.token)await connectSelectedAccount();else{$('accountType').value='demo';state.accountType='demo';toast('Connect Deriv first.')}};
 $('autoMode').onchange=e=>{if(state.tradeMode!=='auto'){e.target.checked=false;return}state.lowDigitStreak=0;state.autoPairUsed=false;if(e.target.checked){toast('3-Digit Auto Over armed.')}else{state.autoRunning=false;state.autoSide=null;clearTimeout(state.autoTimer);toast('3-Digit Auto Over off.')}syncTradingMode();};
 $('market').onchange=e=>{state.symbol=e.target.value;state.prices=[];state.digits=Array(10).fill(0);if(ui.tickCount)ui.tickCount.textContent='0';connectPublic()};
-$('stopLoss').oninput=riskUpdate;$('targetProfit').oninput=riskUpdate;$('ticks').oninput=readRisk;$('multiplier').onchange=readRisk;
+$('stopLoss').oninput=riskUpdate;$('targetProfit').oninput=riskUpdate;$('ticks').oninput=readRisk;$('ticks').onblur=()=>{if(!$('ticks').value)$('ticks').value=state.ticks;readRisk()};$('multiplier').onchange=readRisk;
 window.addEventListener('resize',drawChart);
 
 setStake(1);updateLabels();syncTradingMode();riskUpdate();connectPublic();finishOAuth().then(()=>{if(auth.token)loadAccounts()});
